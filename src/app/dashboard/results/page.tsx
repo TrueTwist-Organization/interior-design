@@ -3,123 +3,216 @@
 import { Button } from "@/components/ui/Button"
 import { Card } from "@/components/ui/Card"
 import { motion } from "framer-motion"
-import { Download, RefreshCw, Video, ArrowLeft, Heart, MoreVertical } from "lucide-react"
+import { Download, RefreshCw, Video, ArrowLeft, Heart, MoreVertical, FileText } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
-
-const rooms = [
-  {
-    name: "Living Room",
-    before: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&q=80&w=800",
-    after: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&q=80&w=800",
-    variations: [
-       "https://images.unsplash.com/photo-1618221195710-dd6b41faeaa6?auto=format&fit=crop&q=40&w=200",
-       "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&q=40&w=200"
-    ]
-  },
-  {
-    name: "Bedroom",
-    before: "https://images.unsplash.com/photo-1560185007-cde436f6a4d0?auto=format&fit=crop&q=80&w=800",
-    after: "https://images.unsplash.com/photo-1616594831254-ae215839f37c?auto=format&fit=crop&q=80&w=800",
-    variations: [
-       "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=40&w=200"
-    ]
-  },
-  {
-    name: "Kitchen",
-    before: "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?auto=format&fit=crop&q=80&w=800",
-    after: "https://images.unsplash.com/photo-1622372738946-62e02505feb3?auto=format&fit=crop&q=80&w=800",
-    variations: []
-  }
-]
+import { InternalSlider } from "@/components/dashboard/InternalSlider"
+import { useEffect, useState } from "react"
+import jsPDF from "jspdf"
 
 export default function ResultsPage() {
-  const [activeTab, setActiveTab] = useState("all")
+  const [designData, setDesignData] = useState<any>(null)
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("latest_design")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        const enhancedRooms = parsed.rooms.map((room: any) => ({
+          ...room,
+          before: room.beforeUrl,
+          after: room.afterUrl,
+          variations: room.variations || []
+        }))
+        setDesignData({ ...parsed, rooms: enhancedRooms })
+      }
+    } catch (err) {
+      console.error("Error loading saved design:", err)
+    }
+  }, [])
+
+  const activeRooms = designData?.rooms || []
+
+  const handleSingleDownload = async (url: string, name: string) => {
+    if (!url) return
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = blobUrl
+      link.download = `${name.toLowerCase().replace(/\s+/g, "-")}-hd.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (e) {
+      console.error("Single download failed", e)
+      window.open(url, "_blank")
+    }
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!activeRooms.length) return
+    setIsDownloading(true)
+    
+    try {
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [1280, 720]
+      })
+
+      for (let i = 0; i < activeRooms.length; i++) {
+        const room = activeRooms[i]
+        const url = room.after || room.afterUrl
+        
+        if (url) {
+          try {
+            // Load image
+            const img = new Image()
+            img.crossOrigin = "anonymous"
+            
+            await new Promise((resolve, reject) => {
+              img.onload = resolve
+              img.onerror = reject
+              // Use proxy if it's external
+              img.src = url.startsWith('http') ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url
+            })
+
+            if (i > 0) pdf.addPage([1280, 720], 'landscape')
+            
+            // Background color
+            pdf.setFillColor(15, 15, 15)
+            pdf.rect(0, 0, 1280, 720, 'F')
+            
+            // Draw image
+            pdf.addImage(img, 'JPEG', 0, 0, 1280, 720)
+            
+            // Overlay Branding
+            pdf.setFillColor(0, 0, 0, 0.5)
+            pdf.rect(50, 600, 300, 80, 'F')
+            
+            pdf.setTextColor(255, 255, 255)
+            pdf.setFontSize(40)
+            pdf.text(room.name.toUpperCase(), 70, 635)
+            
+            pdf.setTextColor(197, 160, 89) // Gold
+            pdf.setFontSize(20)
+            pdf.text(`${designData?.style || 'Luxury'} Interior AI Design`, 70, 665)
+            
+            pdf.setTextColor(255, 255, 255)
+            pdf.setFontSize(15)
+            pdf.text("INTERIORAI STUDIO", 1100, 680)
+
+          } catch (err) {
+            console.error(`Failed to add room ${room.name} to PDF`, err)
+          }
+        }
+      }
+
+      pdf.save(`interior-ai-design-report-${Date.now()}.pdf`)
+    } catch (err) {
+      console.error("PDF generation failed", err)
+      alert("Could not generate PDF. Please try individual downloads.")
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-        <div>
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary mb-2 transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to Upload
+    <div className="max-w-7xl mx-auto px-4 md:px-6 pt-24 md:pt-32 pb-16">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 md:mb-12 text-center sm:text-left">
+        <div className="space-y-1">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-slate-500 hover:text-[#C5A059] mb-2 transition-colors text-xs uppercase font-bold tracking-widest mx-auto sm:mx-0">
+            <ArrowLeft className="w-3 h-3" /> Back to Upload
           </Link>
-          <h1 className="text-4xl font-bold">Your AI Design Results</h1>
-          <p className="text-muted-foreground">Style: Modern Home | Property: 2 BHK</p>
+          <h1 className="text-3xl md:text-5xl font-light font-display text-white leading-tight">Your AI Design <span className="text-[#C5A059] font-bold">Results</span></h1>
+          <p className="text-slate-500 tracking-wide text-[10px] md:text-xs uppercase font-bold">
+            Style: <span className="text-white">{designData?.style || "Modern"}</span> | 
+            Property: <span className="text-white">{designData?.bhk || "2 BHK"}</span> | 
+            Results: <span className="text-[#C5A059]">{activeRooms.length} Angles</span>
+          </p>
         </div>
         
-        <div className="flex gap-4">
-           <Link href="/video-generation">
-             <Button variant="outline" className="gap-2 rounded-2xl h-14 px-8 border-2 border-primary text-primary hover:bg-primary/5">
-                <Video className="w-5 h-5" /> Generate House Tour
+        <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+           <Link href="/video-generation" className="flex-1">
+             <Button variant="outline" className="w-full gap-2 rounded-2xl h-14 px-6 border-white/10 bg-[#0F0F0F] text-white hover:bg-[#C5A059] hover:text-black hover:border-[#C5A059] transition-all text-xs font-bold uppercase tracking-widest">
+                <Video className="w-4 h-4 text-[#C5A059]" /> Generate House Tour
              </Button>
            </Link>
-           <Button className="gap-2 rounded-2xl h-14 px-8 shadow-xl shadow-primary/20 bg-linear-to-r from-indigo-600 via-purple-600 to-indigo-600">
-              <Download className="w-5 h-5" /> Download All HD
+           <Button 
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="flex-1 gap-2 rounded-2xl h-14 px-10 shadow-xl shadow-[#C5A059]/10 bg-[#C5A059] text-black font-black uppercase tracking-widest hover:bg-white text-[10px] min-w-[240px]"
+           >
+              {isDownloading ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              {isDownloading ? "Generating PDF..." : "Download All in PDF"}
            </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {rooms.map((room, idx) => (
-          <motion.div 
-            key={idx}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.1 }}
-          >
-            <Card className="glass group">
-               <div className="relative aspect-square overflow-hidden">
-                  <img src={room.after} alt={room.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-primary">
-                      {room.name}
-                  </div>
-                  <div className="absolute top-4 right-4 flex gap-2">
-                     <button className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/40 transition-colors">
-                        <Heart className="w-4 h-4" />
-                     </button>
-                     <button className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/40 transition-colors">
-                        <MoreVertical className="w-4 h-4" />
-                     </button>
-                  </div>
-                  
-                  {/* Floating Action Overlay on Hover */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                     <Button size="sm" variant="glass" className="h-10 px-4">Compare</Button>
-                     <Button size="sm" variant="glass" className="h-10 px-4">Download</Button>
-                  </div>
-               </div>
+      {activeRooms.length === 0 ? (
+        <div className="text-center py-20 bg-[#0F0F0F] rounded-[3rem] border border-dashed border-white/10">
+          <p className="text-slate-500 uppercase tracking-widest text-xs">No designs found. Go back to dashboard to generate.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+          {activeRooms.map((room: any, idx: number) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+            >
+              <Card className="bg-[#0F0F0F] border-white/10 group overflow-hidden rounded-[2rem] shadow-2xl transition-all hover:border-[#C5A059]/30">
+                <div className="p-2">
+                    <InternalSlider 
+                      before={room.before || room.beforeUrl} 
+                      after={room.after || room.afterUrl} 
+                    />
+                </div>
 
-               <div className="p-6">
-                  <div className="flex justify-between items-center mb-4">
-                     <h3 className="font-bold text-lg">{room.name}</h3>
-                     <span className="text-xs text-muted-foreground">Generated 2m ago</span>
-                  </div>
-
-                  {room.variations.length > 0 && (
-                    <div className="mb-6">
-                       <p className="text-xs font-bold mb-3 text-muted-foreground uppercase tracking-widest">More Variations</p>
-                       <div className="flex gap-2">
-                          {room.variations.map((v, i) => (
-                             <div key={i} className="w-12 h-12 rounded-xl overflow-hidden border-2 border-transparent hover:border-primary cursor-pointer transition-all">
-                                <img src={v} className="w-full h-full object-cover" />
-                             </div>
-                          ))}
-                          <button className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors">
-                             <RefreshCw className="w-5 h-5" />
-                          </button>
-                       </div>
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-bold text-base md:text-lg text-white">{room.name}</h3>
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059] animate-pulse" />
+                        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest">AI Standard</span>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="flex gap-2">
-                     <Button variant="outline" className="flex-1 rounded-xl h-10 px-0">Regenerate</Button>
-                     <Button className="flex-1 rounded-xl h-10 px-0">Edit Details</Button>
-                  </div>
-               </div>
-            </Card>
-          </motion.div>
-        ))}
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleSingleDownload(room.after || room.afterUrl, room.name)}
+                        className="flex-1 rounded-xl h-10 px-0 bg-[#C5A059] text-black font-black uppercase tracking-widest text-[9px] hover:bg-white transition-all shadow-lg shadow-[#C5A059]/10"
+                      >
+                        Single Download
+                      </button>
+                      <Link href="/dashboard" className="flex-1">
+                        <Button variant="outline" className="w-full rounded-xl h-10 px-0 bg-transparent border-white/10 text-white hover:bg-white/5 hover:text-white text-[9px] uppercase font-black tracking-widest">Regenerate</Button>
+                      </Link>
+                    </div>
+                </div>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Mobile Sticky CTA */}
+      <div className="fixed bottom-6 left-6 right-6 lg:hidden z-50">
+         <Link href="/video-generation">
+           <button className="w-full bg-white text-black font-black uppercase tracking-[0.2em] py-5 rounded-3xl shadow-3xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+             <Video className="w-4 h-4" /> House Tour Studio
+           </button>
+         </Link>
       </div>
+
     </div>
   )
 }

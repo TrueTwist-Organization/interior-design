@@ -35,23 +35,23 @@ const history = [
 
 export default function HistoryPage() {
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
+    <div className="max-w-7xl mx-auto px-6 pt-32 pb-16">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Design History</h1>
-          <p className="text-muted-foreground">Revisit and manage your previous AI interior designs.</p>
+          <h1 className="text-4xl font-light font-display text-white mb-2">Design History</h1>
+          <p className="text-slate-500">Revisit and manage your previous AI interior designs.</p>
         </div>
         
-        <div className="flex gap-4">
-           <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        <div className="flex flex-wrap gap-4 mt-4 md:mt-0">
+           <div className="relative group w-full md:w-auto">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 transition-colors group-focus-within:text-[#C5A059]" />
               <input 
                  type="text" 
                  placeholder="Search designs..." 
-                 className="h-12 bg-white rounded-2xl border border-border pl-12 pr-4 w-64 focus:ring-2 focus:ring-primary focus:outline-none"
+                 className="h-12 bg-[#0F0F0F] text-white rounded-2xl border border-white/10 pl-12 pr-4 w-64 focus:ring-1 focus:ring-[#C5A059] focus:outline-none"
               />
            </div>
-           <Button variant="outline" className="rounded-2xl h-12 gap-2">
+           <Button variant="outline" className="rounded-2xl h-12 gap-2 border-white/10 bg-[#0F0F0F] text-white hover:bg-[#1A1A1A]">
               <Filter className="w-4 h-4" /> Filter
            </Button>
         </div>
@@ -65,7 +65,7 @@ export default function HistoryPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
           >
-            <Card className="glass group overflow-hidden">
+            <Card className="bg-[#0F0F0F] border-white/10 group overflow-hidden">
                <div className="relative aspect-video overflow-hidden">
                   <img src={item.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -82,16 +82,16 @@ export default function HistoryPage() {
                
                <div className="p-6">
                   <div className="flex items-center gap-2 mb-4">
-                     <Calendar className="w-3 h-3 text-muted-foreground" />
-                     <span className="text-xs text-muted-foreground font-medium">{item.date}</span>
+                     <Calendar className="w-3 h-3 text-slate-500" />
+                     <span className="text-xs text-slate-500 font-medium">{item.date}</span>
                   </div>
-                  <h3 className="font-bold mb-1">{item.type} Property</h3>
-                  <p className="text-sm text-muted-foreground mb-6">{item.style}</p>
+                  <h3 className="font-bold mb-1 text-white">{item.type} Property</h3>
+                  <p className="text-sm text-slate-500 mb-6">{item.style}</p>
                   
                   <div className="flex gap-2">
-                     <Button variant="secondary" className="flex-1 h-9 text-xs rounded-xl">Edit Name</Button>
-                     <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl">
-                        <Download className="w-4 h-4 text-primary" />
+                     <Button variant="outline" className="flex-1 h-9 text-xs rounded-xl bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white">Edit Name</Button>
+                     <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-white/10 bg-white/5 hover:bg-white/10">
+                        <Download className="w-4 h-4 text-[#C5A059]" />
                      </Button>
                   </div>
                </div>

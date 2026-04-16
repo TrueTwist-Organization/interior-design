@@ -19,14 +19,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${outfit.variable} font-sans antialiased overflow-x-hidden`}>
-        {/* Abstract Background Decorations */}
-        <div className="fixed inset-0 -z-10 bg-grid pointer-events-none opacity-50" />
-        <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-indigo-200/30 blur-[120px] rounded-full -z-10" />
-        <div className="fixed bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-200/30 blur-[120px] rounded-full -z-10" />
-        
+      <head>
+        <link rel="stylesheet" href="https://cdn.pannellum.org/2.5/pannellum.css" />
+        <script src="https://cdn.pannellum.org/2.5/pannellum.js"></script>
+      </head>
+      <body className={`${inter.variable} ${outfit.variable} font-sans antialiased overflow-x-hidden bg-[#0A0A0A]`}>
         <Navbar />
-        <main className="min-h-screen pt-24">
+        <main className="min-h-screen">
           {children}
         </main>
         <Footer />

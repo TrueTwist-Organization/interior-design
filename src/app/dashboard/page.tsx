@@ -1,247 +1,375 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/Button"
-import { Card } from "@/components/ui/Card"
-import { Upload, X, Home, Palette, Sparkles, CheckCircle2, ChevronRight, Layout } from "lucide-react"
-import Link from "next/link"
+import { Home, Upload, Sparkles, ArrowRight, CheckCircle2, ChevronRight, Layout, Camera, Wand2, Briefcase } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-
-
-
-type BHK = "1 BHK" | "2 BHK" | "3 BHK" | "4 BHK"
-
-const roomTypesByBHK: Record<BHK, string[]> = {
-  "1 BHK": ["Living Room", "Bedroom", "Kitchen"],
-  "2 BHK": ["Living Room", "Bedroom 1", "Bedroom 2", "Kitchen"],
-  "3 BHK": ["Living Room", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Kitchen", "Balcony"],
-  "4 BHK": ["Living Room", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Kitchen", "Dining Room", "Balcony"]
-}
-
-const styles = [
-  { name: "Modern", img: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&q=80&w=300" },
-  { name: "Luxury", img: "https://images.unsplash.com/photo-1618221195710-dd6b41faeaa6?auto=format&fit=crop&q=80&w=300" },
-  { name: "Minimalist", img: "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&q=80&w=300" },
-  { name: "Scandinavian", img: "https://images.unsplash.com/photo-1594897030264-ab7d87efc473?auto=format&fit=crop&q=80&w=300" },
-  { name: "Industrial", img: "https://images.unsplash.com/photo-1512914890251-2f96a9b092e3?auto=format&fit=crop&q=80&w=300" },
-  { name: "Classic", img: "https://images.unsplash.com/photo-1615876234886-fd9a39faa97f?auto=format&fit=crop&q=80&w=300" },
-]
 
 export default function DashboardPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
-  const [selectedBHK, setSelectedBHK] = useState<BHK | null>(null)
+  const [selectedBHK, setSelectedBHK] = useState<string | null>(null)
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
+  const [customPrompt, setCustomPrompt] = useState("")
   const [uploads, setUploads] = useState<Record<string, File[]>>({})
   const [isGenerating, setIsGenerating] = useState(false)
+  const [processingStatus, setProcessingStatus] = useState("")
 
-  useEffect(() => {
-    if (isGenerating) {
-      const timer = setTimeout(() => {
-        router.push("/dashboard/results")
-      }, 6000) // Redirect after 6 seconds to simulate generation
-      return () => clearTimeout(timer)
+  const roomTypes: Record<string, string[]> = {
+    "1 BHK": ["Living Room", "Bedroom", "Kitchen", "Balcony"],
+    "2 BHK": ["Living Room", "Bedroom 1", "Bedroom 2", "Kitchen", "Balcony"],
+    "3 BHK": ["Living Room", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Kitchen", "Balcony"],
+    "4 BHK": ["Living Room", "Master Bed", "Bedroom 2", "Bedroom 3", "Bedroom 4", "Kitchen", "Balcony"],
+    "Office": ["Main Cabin", "Workstation Area", "Conference Room", "Reception"]
+  }
+
+  const styles = [
+    { name: "Modern",        img: "https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e?auto=format&fit=crop&w=800&q=80" },
+    { name: "Luxury",        img: "https://images.unsplash.com/photo-1631679706909-1844bbd07221?auto=format&fit=crop&w=800&q=80" },
+    { name: "Minimalist",    img: "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80" },
+    { name: "Scandinavian",  img: "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=800&q=80" },
+    { name: "Industrial",    img: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80" },
+    { name: "Classic",       img: "https://images.unsplash.com/photo-1562663474-6cbb3eaa4d14?auto=format&fit=crop&w=800&q=80" },
+  ]
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width, height = img.height;
+          const maxDim = 800;
+          if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+          else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const compressForStorage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width, height = img.height;
+          const maxDim = 400;
+          if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+          else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.4));
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const buildStagedPrompt = (roomName: string, style: string, stage: number) => {
+    const s = style || "modern luxury";
+    const lower = roomName.toLowerCase();
+    let furniture = "";
+
+    if (stage === 1) {
+      furniture = lower.includes("living") ? "ONLY primary furniture like a designer sofa and coffee table, empty walls" 
+                : lower.includes("bedroom") ? "ONLY a modern king-size bed and wardrobe, empty walls"
+                : lower.includes("kitchen") ? "ONLY basic modern modular cabinetry and a kitchen island"
+                : (lower.includes("cabin") || lower.includes("ceo")) ? "ONLY a massive L-shaped grand executive desk and premium CEO chair"
+                : lower.includes("workstation") ? "ONLY rows of high-end ergonomic office desks and task chairs"
+                : "ONLY primary essential professional furniture";
+    } else {
+      furniture = lower.includes("living") ? "full luxury living room with sofa, coffee table, TV unit, lush area rug, curtains, wall art, and ambient designer lighting"
+                : lower.includes("bedroom") ? "full master bedroom with bed, wardrobe, TV unit, vanity desk, pendant lights, luxury rugs, and floor-to-ceiling curtains"
+                : lower.includes("kitchen") ? "complete professional kitchen suite with bar stools, pendant lighting, professional decor, and premium textures"
+                : (lower.includes("cabin") || lower.includes("ceo")) ? "ultra-premium CEO executive office suite with a massive monolithic designer desk, high-back Italian leather CEO chair, guest seating area with luxury armchairs, floor-to-ceiling wooden library walls with integrated accent lighting, professional workstations with elegant technology, and expansive glass partitions"
+                : lower.includes("workstation") ? "elite corporate workstation area with multiple rows of dual-monitor desks, premium task chairs, MacBook Pro laptops, acoustic ceiling clouds, linear architectural lighting, and floor-to-ceiling windows with a professional view"
+                : lower.includes("conference") ? "grand boardroom with a massive solid wood executive table, luxury leather swivel chairs, integrated media wall, and sophisticated acoustic treatment"
+                : "fully curated luxury architectural interior with professional furniture, high-end hardware like laptops and monitors, and premium corporate textures";
     }
-  }, [isGenerating, router])
 
-  const handleNext = () => setStep(prev => prev + 1)
-  const handleBack = () => setStep(prev => prev - 1)
+    return `${s} interior design, ${roomName}, ${furniture}. Professional architectural photography, 8k, realistic, maintain room structure, bright lighting.`;
+  };
 
-
-  const handleFileUpload = (room: string, files: FileList | null) => {
-    if (!files) return
-    const newFiles = Array.from(files)
-    setUploads(prev => ({
-      ...prev,
-      [room]: [...(prev[room] || []), ...newFiles]
-    }))
-  }
-
-  const removeFile = (room: string, index: number) => {
-    setUploads(prev => ({
-      ...prev,
-      [room]: prev[room].filter((_, i) => i !== index)
-    }))
-  }
-
-  const renderStep = () => {
-    switch(step) {
-      case 1:
-        return (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-2">Select Property Type</h2>
-              <p className="text-muted-foreground">Tell us about the size of your space.</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.keys(roomTypesByBHK).map((bhk) => (
-                <button
-                  key={bhk}
-                  onClick={() => setSelectedBHK(bhk as BHK)}
-                  className={`p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 ${
-                    selectedBHK === bhk ? 'border-primary bg-primary/5 ring-4 ring-primary/10' : 'border-border bg-white hover:border-primary/50'
-                  }`}
-                >
-                  <Home className={`w-8 h-8 ${selectedBHK === bhk ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <span className="font-bold">{bhk}</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-center pt-8">
-              <Button size="lg" disabled={!selectedBHK} onClick={handleNext} className="gap-2">
-                Continue to Uploads <ChevronRight className="w-5 h-5" />
-              </Button>
-            </div>
-          </motion.div>
-        )
-
-      case 2:
-        return (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-2">Upload Room Photos</h2>
-              <p className="text-muted-foreground">Upload 3-4 photos for each room for the best results.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {selectedBHK && roomTypesByBHK[selectedBHK].map((room) => (
-                <Card key={room} className="p-6 glass">
-                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                    <Layout className="w-5 h-5 text-primary" /> {room}
-                  </h3>
-                  
-                  <div className="relative border-2 border-dashed border-border rounded-2xl p-8 transition-colors hover:border-primary/50 text-center">
-                    <input 
-                      type="file" 
-                      multiple 
-                      onChange={(e) => handleFileUpload(room, e.target.files)}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                    />
-                    <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Drag & drop or <span className="text-primary font-bold">browse</span></p>
-                  </div>
-
-                  {uploads[room] && uploads[room].length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {uploads[room].map((file, idx) => (
-                        <div key={idx} className="group relative w-16 h-16 rounded-lg overflow-hidden border border-border">
-                          <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
-                          <button 
-                            onClick={() => removeFile(room, idx)}
-                            className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-
-            <div className="flex justify-between pt-8">
-              <Button variant="ghost" onClick={handleBack}>Back</Button>
-              <Button size="lg" onClick={handleNext}>Continue to Style</Button>
-            </div>
-          </motion.div>
-        )
-
-      case 3:
-        return (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-2">Select Design Style</h2>
-              <p className="text-muted-foreground">Choose the aesthetic that defines your dream space.</p>
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-              {styles.map((style) => (
-                <button
-                  key={style.name}
-                  onClick={() => setSelectedStyle(style.name)}
-                  className={`group relative aspect-video rounded-[2rem] overflow-hidden border-4 transition-all ${
-                    selectedStyle === style.name ? 'border-primary ring-4 ring-primary/10' : 'border-transparent'
-                  }`}
-                >
-                  <img src={style.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent flex items-end p-6">
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-white font-bold text-lg">{style.name}</span>
-                      {selectedStyle === style.name && <CheckCircle2 className="text-primary fill-white w-6 h-6" />}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex justify-between pt-8">
-              <Button variant="ghost" onClick={handleBack}>Back</Button>
-              <Button size="lg" disabled={!selectedStyle} onClick={() => setIsGenerating(true)} className="gap-2 bg-linear-to-r from-indigo-600 to-purple-600">
-                <Sparkles className="w-5 h-5" /> Generate AI Design
-              </Button>
-            </div>
-          </motion.div>
-        )
+  const handleStartGeneration = async () => {
+    if (Object.keys(uploads).length === 0) {
+      alert("Please upload at least one photo.");
+      return;
     }
-  }
+    setIsGenerating(true);
+    
+    try {
+      const results = [];
+      const roomsToProcess = Object.entries(uploads);
+      
+      for (const [roomName, files] of roomsToProcess) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const angleLabel = files.length > 1 ? ` - Angle ${i + 1}` : "";
+          const dataUri = await compressImage(file);
+          const pureBase64 = dataUri.split(",")[1];
+          const thumbnailUri = await compressForStorage(file);
+          
+          const stages = [];
+          for (let stageNum = 1; stageNum <= 2; stageNum++) {
+            setProcessingStatus(`Designing ${roomName}: Phase ${stageNum}/2...`);
+            const roomPrompt = buildStagedPrompt(roomName, selectedStyle || "Luxury", stageNum);
+
+            const response = await fetch("/api/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image: pureBase64, prompt: roomPrompt })
+            });
+
+            if (!response.ok) throw new Error("Generation failed at phase " + stageNum);
+
+            const data = await response.json();
+            stages.push(data.image);
+          }
+
+          results.push({
+            name: `${roomName}${angleLabel}`,
+            beforeUrl: thumbnailUri,
+            afterUrl: stages[1], // Final frame
+            allStages: [thumbnailUri, ...stages] // Empty + 2 logic layers (Total 3)
+          });
+        }
+      }
+
+      localStorage.setItem("latest_design", JSON.stringify({
+        style: selectedStyle,
+        bhk: selectedBHK,
+        rooms: results
+      }));
+      router.push("/dashboard/results");
+
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+      setIsGenerating(false);
+    }
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      {/* Progress Stepper */}
-      {!isGenerating && (
-        <div className="flex items-center justify-center gap-4 mb-20 overflow-x-auto pb-4">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all ${
-                step === s ? 'bg-primary text-white shadow-lg shadow-primary/30' : 
-                step > s ? 'bg-green-500 text-white' : 'bg-secondary text-muted-foreground'
-              }`}>
-                {step > s ? <CheckCircle2 className="w-6 h-6" /> : s}
-              </div>
-              {s < 3 && <div className={`w-12 h-0.5 rounded-full ${step > s ? 'bg-green-500' : 'bg-secondary'}`} />}
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="min-h-screen bg-[#050505] text-white pt-32 pb-20 px-4 md:px-10 relative overflow-hidden">
+      {/* Background flare */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#C5A059] opacity-[0.02] blur-[200px] -z-10" />
+      <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
+           style={{ backgroundImage: 'linear-gradient(#C5A059 1px, transparent 1px), linear-gradient(90deg, #C5A059 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
 
-      {isGenerating ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center">
-            <motion.div
-                animate={{ 
-                    scale: [1, 1.1, 1],
-                    rotate: [0, 180, 360]
-                }}
-                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                className="w-32 h-32 border-8 border-primary/20 border-t-primary rounded-full mb-12"
-            />
-            <h2 className="text-4xl font-bold mb-4 animate-pulse">Designing Your Space...</h2>
-            <div className="space-y-4 max-w-sm w-full">
-                {[
-                    "Uploading images...",
-                    "Processing room boundaries...",
-                    "Applying Modern style...",
-                    "Generating 4K renders..."
-                ].map((text, i) => (
-                    <motion.div 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 1 }}
-                        key={i} 
-                        className="flex items-center gap-3 text-muted-foreground"
-                    >
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        <span>{text}</span>
-                    </motion.div>
-                ))}
+      <div className="max-w-6xl mx-auto relative">
+        
+        {/* Step Indicator */}
+        {!isGenerating && (
+          <div className="flex items-center justify-center gap-4 mb-20">
+            {[1,2,3].map(s => (
+              <div key={s} className="flex items-center">
+                 <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-black transition-all duration-700 ${step >= s ? 'border-[#C5A059] bg-[#C5A059] text-black shadow-[0_0_15px_rgba(197,160,89,0.4)]' : 'border-white/10 text-white/20'}`}>
+                    {step > s ? '✓' : s}
+                 </div>
+                 {s < 3 && <div className={`w-12 h-px transition-all duration-700 ${step > s ? 'bg-[#C5A059]' : 'bg-white/10'}`} />}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isGenerating ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center space-y-12">
+            <div className="relative">
+               <div className="w-32 h-32 border-2 border-white/5 rounded-full" />
+               <motion.div 
+                 animate={{ rotate: 360 }}
+                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                 className="absolute inset-0 border-t-2 border-[#C5A059] rounded-full"
+               />
+               <Sparkles className="absolute inset-0 m-auto w-10 h-10 text-[#C5A059] animate-pulse" />
             </div>
-            <Link href="/dashboard/results" className="mt-12">
-                <Button variant="ghost">Skip logic and view demo results</Button>
-            </Link>
-        </div>
-      ) : renderStep()}
+            <div className="space-y-4">
+               <h2 className="text-4xl md:text-6xl font-light uppercase tracking-[0.2em] text-white">Synthesizing <span className="font-bold text-luxury">Design</span></h2>
+               <p className="text-slate-500 uppercase tracking-[0.5em] text-[10px] md:text-xs font-black animate-pulse">{processingStatus}</p>
+            </div>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {step === 1 && (
+              <motion.div 
+                key="step1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className="space-y-16"
+              >
+                <div className="text-center space-y-4">
+                   <span className="text-[#C5A059] font-black uppercase tracking-[0.5em] text-[10px]">Step 01</span>
+                   <h2 className="text-4xl md:text-7xl font-light text-white uppercase tracking-tighter">Spatial <span className="font-bold italic">Scale</span></h2>
+                </div>
+                
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+                  {Object.keys(roomTypes).map(bhk => (
+                  <button 
+                    key={bhk} 
+                    onClick={() => setSelectedBHK(bhk)} 
+                    className={`relative group p-6 md:p-10 transition-all duration-700 rounded-[2rem] border-2 flex flex-col items-center justify-center gap-3 ${
+                      selectedBHK === bhk 
+                      ? 'bg-[#C5A059] border-[#C5A059] shadow-[0_0_30px_rgba(197,160,89,0.3)] text-black' 
+                      : 'bg-[#121212] border-white/5 text-white/40 hover:border-white/20 hover:bg-[#181818]'
+                    }`}
+                  >
+                    <div className={`p-3 md:p-4 rounded-2xl transition-all duration-700 ${selectedBHK === bhk ? 'bg-black/10' : 'bg-white/5 group-hover:bg-[#C5A059]/10'}`}>
+                       {bhk === "Office" ? 
+                         <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}><Briefcase className={`w-6 h-6 md:w-10 md:h-10 ${selectedBHK === bhk ? 'text-black' : 'text-inherit group-hover:text-[#C5A059]'}`} /></motion.div> :
+                         <Home className={`w-6 h-6 md:w-10 md:h-10 ${selectedBHK === bhk ? 'text-black' : 'text-inherit group-hover:text-[#C5A059]'}`} />
+                       }
+                    </div>
+                    <span className="font-black tracking-[0.3em] uppercase text-[9px] md:text-xs text-center">{bhk}</span>
+                  </button>
+                ))}
+                </div>
+
+                <div className="flex justify-center pt-10">
+                  <button 
+                    disabled={!selectedBHK} onClick={() => setStep(2)} 
+                    className="group bg-white text-black px-16 py-6 font-black uppercase tracking-[0.3em] hover:bg-[#C5A059] hover:text-white transition-all duration-700 disabled:opacity-20 flex items-center gap-4"
+                  >
+                    Configure Rooms <ChevronRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div 
+                key="step2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+                className="space-y-12"
+              >
+                <div className="text-center space-y-4">
+                   <span className="text-[#C5A059] font-black uppercase tracking-[0.5em] text-[10px]">Step 02</span>
+                   <h2 className="text-4xl md:text-7xl font-light text-white uppercase tracking-tighter">Capture <span className="font-bold italic">Angles</span></h2>
+                   <p className="text-[10px] text-slate-500 tracking-[0.3em] uppercase max-w-md mx-auto">Upload varied perspectives for high-fidelity spatial awareness.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {selectedBHK && roomTypes[selectedBHK].map((room, idx) => {
+                    const isLastOdd = roomTypes[selectedBHK].length % 2 !== 0 && idx === roomTypes[selectedBHK].length - 1
+                    const roomFiles = uploads[room] || []
+                    
+                    return (
+                      <div key={room} className={`bg-[#121212] border border-white/5 rounded-[2.5rem] p-6 md:p-8 space-y-6 transition-all duration-700 hover:border-white/10 ${isLastOdd ? 'md:col-span-2' : ''}`}>
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${roomFiles.length > 0 ? 'bg-[#C5A059] animate-pulse' : 'bg-white/10'}`} />
+                              <h3 className="text-white font-black uppercase tracking-[0.2em] text-[10px] md:text-xs">{room}</h3>
+                           </div>
+                           {roomFiles.length > 0 && <span className="text-[8px] font-black text-[#C5A059] uppercase tracking-[0.3em] bg-[#C5A059]/10 px-4 py-2 rounded-full border border-[#C5A059]/20">PROTOCOL READY</span>}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-6">
+                           <div className="flex-1 relative aspect-[4/3] rounded-3xl overflow-hidden border border-white/5 bg-[#050505] group transition-all hover:border-[#C5A059]/30">
+                              <input type="file" accept="image/*" onChange={(e) => {
+                                 if (e.target.files) {
+                                   setUploads(prev => ({ ...prev, [room]: [...(prev[room] || []), ...Array.from(e.target.files!)].slice(0, 4) }))
+                                 }
+                              }} className="absolute inset-0 z-10 opacity-0 cursor-pointer" />
+                              {roomFiles[0] ? (
+                                <>
+                                  <img src={URL.createObjectURL(roomFiles[0])} className="w-full h-full object-cover" />
+                                  <button onClick={(e) => { e.stopPropagation(); setUploads(prev => ({ ...prev, [room]: prev[room].filter((_, i) => i !== 0) })) }} className="absolute top-3 right-3 w-8 h-8 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:text-[#C5A059] transition-all z-20">✕</button>
+                                </>
+                              ) : (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                                   <Camera className="w-8 h-8 text-white/5 group-hover:text-[#C5A059] transition-all duration-700" />
+                                   <p className="text-[8px] text-white/20 uppercase font-black tracking-[0.3em] group-hover:text-white/40 transition-colors">Capture Primary</p>
+                                </div>
+                              )}
+                           </div>
+                           
+                           <div className="flex sm:flex-col gap-3 overflow-x-auto sm:w-28 scrollbar-hide">
+                              {[1, 2, 3].map(i => (
+                                <div key={i} className="relative shrink-0 w-20 h-20 sm:w-auto sm:flex-1 rounded-2xl overflow-hidden border border-white/5 bg-black group hover:border-[#C5A059]/30 cursor-pointer transition-all">
+                                  <input type="file" accept="image/*" onChange={(e) => {
+                                     if (e.target.files) {
+                                       setUploads(prev => ({ ...prev, [room]: [...(prev[room] || []), ...Array.from(e.target.files!)].slice(0, 4) }))
+                                     }
+                                  }} className="absolute inset-0 z-10 opacity-0 cursor-pointer" />
+                                  {roomFiles[i] ? (
+                                    <>
+                                      <img src={URL.createObjectURL(roomFiles[i])} className="w-full h-full object-cover" />
+                                      <button onClick={(e) => { e.stopPropagation(); setUploads(prev => ({ ...prev, [room]: prev[room].filter((_, fi) => fi !== i) })) }} className="absolute top-1 right-1 w-5 h-5 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white text-[8px] z-20">✕</button>
+                                    </>
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <span className="text-white/5 font-black text-xl group-hover:text-[#C5A059]/20 transition-colors">+</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-8 pt-10 border-t border-white/5">
+                  <button onClick={() => setStep(1)} className="text-white/30 hover:text-white uppercase font-black tracking-[0.4em] text-[10px] transition-colors">Back to Scale</button>
+                  <button onClick={() => setStep(3)} className="w-full sm:w-auto bg-white text-black px-12 py-6 font-black uppercase tracking-[0.3em] hover:bg-[#C5A059] hover:text-white transition-all duration-700 shadow-2xl flex items-center justify-center gap-4">
+                    Inspiration Select <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div 
+                key="step3" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="space-y-12"
+              >
+                <div className="text-center space-y-4">
+                   <span className="text-[#C5A059] font-black uppercase tracking-[0.5em] text-[10px]">Step 03</span>
+                   <h2 className="text-4xl md:text-7xl font-light text-white uppercase tracking-tighter">Style <span className="font-bold italic text-luxury">Protocol</span></h2>
+                   <p className="text-[10px] text-slate-500 tracking-[0.3em] uppercase max-w-md mx-auto">Select the aesthetic blueprint for your neural synthesis.</p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                  {styles.map(style => (
+                    <button 
+                      key={style.name} onClick={() => setSelectedStyle(style.name)} 
+                      className={`relative aspect-[3/4] overflow-hidden rounded-[2.5rem] border-2 transition-all duration-1000 group ${selectedStyle === style.name ? 'border-[#C5A059] gold-shadow scale-[1.03]' : 'border-white/5 opacity-50 hover:opacity-100'}`}
+                    >
+                      <img src={style.img} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-linear-to-t from-black via-black/20 to-transparent flex items-end p-8 text-left">
+                        <div>
+                          <span className={`block text-xs font-black uppercase tracking-[0.3em] transition-all duration-700 ${selectedStyle === style.name ? 'text-[#C5A059] translate-y-0' : 'text-white translate-y-2'}`}>{style.name}</span>
+                          {selectedStyle === style.name && <div className="h-0.5 w-8 bg-[#C5A059] mt-2 animate-width" />}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-8">
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-4 block text-center">Custom Directives (Optional)</span>
+                  <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Enter unique spatial characteristics or specific furniture intents..." className="w-full max-w-2xl mx-auto block bg-white/5 border border-white/5 p-8 text-white text-xs md:text-sm rounded-3xl focus:border-[#C5A059]/50 transition-all outline-none h-32 md:h-40 font-light tracking-wide" />
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-10 py-12 border-t border-white/5">
+                  <button onClick={() => setStep(2)} className="text-white/30 hover:text-white uppercase font-black tracking-[0.4em] text-[10px]">Back</button>
+                  <button onClick={handleStartGeneration} className="w-full sm:w-auto bg-[#C5A059] text-black px-16 py-8 font-black uppercase tracking-[0.4em] hover:bg-white hover:text-[#C5A059] transition-all duration-700 shadow-2xl gold-shadow flex items-center justify-center gap-6">
+                    SYNTHESIZE DESIGN <Wand2 className="w-6 h-6" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </div>
     </div>
   )
 }

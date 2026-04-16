@@ -27,18 +27,24 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   return (
-    <section className="py-24 px-6">
+    <section className="py-32 px-6 bg-[#0A0A0A] border-t border-white/5">
       <div className="max-w-3xl mx-auto">
-        <h2 className="text-4xl font-bold text-center mb-16">Common Questions</h2>
+        <div className="text-center mb-24 space-y-4">
+           <span className="text-[#C5A059] font-bold uppercase tracking-[0.4em] text-[10px]">Curation 06</span>
+           <h2 className="text-5xl md:text-7xl font-light text-white font-display">Common <span className="font-bold">Questions</span></h2>
+           <div className="h-px w-20 bg-[#C5A059] mx-auto mt-6" />
+        </div>
         <div className="space-y-4">
           {faqs.map((faq, idx) => (
-            <div key={idx} className="border-b border-border">
+            <div key={idx} className="border-b border-white/10 group">
               <button
                 onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-                className="w-full py-6 flex items-center justify-between text-left hover:text-primary transition-colors"
+                className="w-full py-8 flex items-center justify-between text-left text-white group-hover:text-[#C5A059] transition-colors"
               >
-                <span className="text-lg font-semibold">{faq.question}</span>
-                {openIndex === idx ? <Minus className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                <span className="text-lg font-light tracking-wide">{faq.question}</span>
+                <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center bg-white/5 group-hover:border-[#C5A059]/30">
+                   {openIndex === idx ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                </div>
               </button>
               <AnimatePresence>
                 {openIndex === idx && (
@@ -48,7 +54,7 @@ export function FAQ() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                    <p className="pb-6 text-muted-foreground leading-relaxed">
+                    <p className="pb-8 text-slate-500 leading-relaxed font-light">
                       {faq.answer}
                     </p>
                   </motion.div>

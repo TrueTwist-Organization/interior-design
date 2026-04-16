@@ -1,60 +1,81 @@
-import Link from "next/link"
-import { Sparkles, Globe, Camera, MessageCircle } from "lucide-react"
+"use client"
 
+import Link from "next/link"
+import { Sparkles, Globe, Mail, MessageSquare } from "lucide-react"
 
 export function Footer() {
   return (
-    <footer className="bg-white border-t border-border mt-20 pt-20 pb-10 px-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-          <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-6">
-              <div className="bg-primary p-2 rounded-xl">
-                <Sparkles className="text-white w-5 h-5" />
-              </div>
-              <span className="text-xl font-bold tracking-tight">InteriorAI</span>
-            </Link>
-            <p className="text-muted-foreground max-w-sm mb-8">
-              Transform your living spaces with the power of artificial intelligence. 
-              The world's first fully automated 3D interior design generator for home tours.
-            </p>
-            <div className="flex gap-4">
-              <a href="#" className="p-2 bg-secondary rounded-full hover:bg-primary hover:text-white transition-colors">
-                <MessageCircle className="w-5 h-5" />
-              </a>
-              <a href="#" className="p-2 bg-secondary rounded-full hover:bg-primary hover:text-white transition-colors">
-                <Camera className="w-5 h-5" />
-              </a>
-              <a href="#" className="p-2 bg-secondary rounded-full hover:bg-primary hover:text-white transition-colors">
-                <Globe className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-bold mb-6">Product</h4>
-            <ul className="space-y-4 text-sm text-muted-foreground">
-              <li><Link href="#features" className="hover:text-primary transition-colors">Features</Link></li>
-              <li><Link href="#how-it-works" className="hover:text-primary transition-colors">How it Works</Link></li>
-              <li><Link href="/pricing" className="hover:text-primary transition-colors">Pricing</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">API Access</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold mb-6">Company</h4>
-            <ul className="space-y-4 text-sm text-muted-foreground">
-              <li><Link href="#" className="hover:text-primary transition-colors">About Us</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Careers</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Terms of Service</Link></li>
-              <li><Link href="#" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
-            </ul>
-          </div>
-        </div>
+    <footer className="bg-[#050505] border-t border-white/5 pt-24 pb-12 px-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-16 md:gap-24 mb-20">
         
-        <div className="pt-8 border-t border-border text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} InteriorAI. All rights reserved.
+        {/* Brand Section */}
+        <div className="md:col-span-5 space-y-10">
+          <Link href="/" className="flex items-center gap-4 group">
+             <div className="w-10 h-10 bg-[#C5A059] flex items-center justify-center rotate-45 transition-all duration-1000 group-hover:rotate-180">
+                <Sparkles className="w-5 h-5 text-black -rotate-45 group-hover:rotate-45 transition-all duration-1000" />
+             </div>
+             <span className="text-xl font-bold tracking-[0.2em] uppercase text-white font-display">Interior<span className="text-[#C5A059]">AI</span></span>
+          </Link>
+          <p className="text-slate-500 text-sm max-w-sm leading-relaxed font-light tracking-wide">
+            Crafting the next generation of architectural visualizations through high-fidelity artificial intelligence. Elevating living standards, one space at a time.
+          </p>
+          <div className="flex gap-6">
+             {[Globe, Mail, MessageSquare].map((Icon, i) => (
+               <a key={i} href="#" className="text-slate-500 hover:text-[#C5A059] transition-colors">
+                  <Icon className="w-5 h-5" />
+               </a>
+             ))}
+          </div>
         </div>
+
+        {/* The Studio Links */}
+        <div className="md:col-span-3 space-y-8">
+           <h4 className="text-[10px] uppercase font-black tracking-[0.4em] text-[#C5A059]">The Studio</h4>
+           <div className="flex flex-col gap-5">
+              {[
+                { name: "Gallery", href: "/#gallery" },
+                { name: "Models", href: "/#features" },
+                { name: "Styles", href: "/#how-it-works" },
+                { name: "Technology", href: "/#pricing" }
+              ].map(link => (
+                <Link key={link.name} href={link.href} className="text-[12px] text-slate-500 hover:text-white transition-all font-light tracking-widest uppercase">
+                   {link.name}
+                </Link>
+              ))}
+           </div>
+        </div>
+
+        {/* Legal Links */}
+        <div className="md:col-span-4 space-y-8">
+           <h4 className="text-[10px] uppercase font-black tracking-[0.4em] text-[#C5A059]">Legal</h4>
+           <div className="flex flex-col gap-5">
+              {[
+                { name: "About Us", href: "/about" },
+                { name: "Contact Us", href: "/contact" },
+                { name: "Terms & Conditions", href: "/terms" },
+                { name: "Privacy Policy", href: "/privacy" },
+                { name: "Disclaimer", href: "/disclaimer" }
+              ].map(link => (
+                <Link key={link.name} href={link.href} className="text-[12px] text-slate-500 hover:text-white transition-all font-light tracking-widest uppercase">
+                  {link.name}
+                </Link>
+              ))}
+           </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto border-t border-white/5 pt-12 flex flex-col items-center justify-center gap-6">
+         <span className="text-[10px] uppercase font-black tracking-[0.3em] text-slate-500">
+            © 2026 InteriorAI Studio. All Rights Reserved.
+         </span>
+         
+         <div className="flex items-center gap-4">
+            <span className="relative flex h-2 w-2">
+               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-[9px] uppercase font-black tracking-[0.3em] text-slate-500">AI Clusters Online</span>
+         </div>
       </div>
     </footer>
   )

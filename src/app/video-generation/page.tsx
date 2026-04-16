@@ -1,192 +1,260 @@
 "use client"
 
-import { Button } from "@/components/ui/Button"
-import { Card } from "@/components/ui/Card"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Play, Pause, SkipForward, SkipBack, Download, Music, Share2, ArrowLeft, Volume2, Maximize, Settings, Video } from "lucide-react"
-
+import { Download, ArrowLeft, Film, RefreshCw, ChevronLeft, ChevronRight, Play, LayoutGrid, Sparkles } from "lucide-react"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
-const images = [
-  "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&q=80&w=1200",
-  "https://images.unsplash.com/photo-1616594831254-ae215839f37c?auto=format&fit=crop&q=80&w=1200",
-  "https://images.unsplash.com/photo-1622372738946-62e02505feb3?auto=format&fit=crop&q=80&w=1200",
-  "https://images.unsplash.com/photo-1618221195710-dd6b41faeaa6?auto=format&fit=crop&q=80&w=1200"
-]
+const VIDEO_W = 1280, VIDEO_H = 720
+const FPS = 24
+const SECONDS_PER_ROOM = 4
+
+function ease(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
 
 export default function VideoGenerationPage() {
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const router = useRouter()
+  const [rooms, setRooms] = useState<any[]>([])
+  const [isGenerating, setIsGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [isGenerating, setIsGenerating] = useState(true)
+  const [status, setStatus] = useState("")
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [previewIdx, setPreviewIdx] = useState(0)
+
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsGenerating(false), 3000)
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            setCurrentIndex((idx) => (idx + 1) % images.length)
-            return 0
-          }
-          return prev + 1
-        })
-      }, 50)
+    const d = localStorage.getItem("latest_design")
+    if (d) {
+      const parsed = JSON.parse(d)
+      setRooms(parsed.rooms || [])
+    } else {
+      router.push("/dashboard")
     }
-    return () => clearInterval(interval)
-  }, [isPlaying])
+  }, [router])
 
-  if (isGenerating) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <div className="relative w-48 h-48 mb-12 flex items-center justify-center">
-           <motion.div 
-             animate={{ rotate: 360 }}
-             transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-             className="absolute inset-0 border-[12px] border-primary/10 border-t-primary rounded-full shadow-[0_0_50px_rgba(99,102,241,0.2)]"
-           />
-           <div className="bg-primary/10 p-6 rounded-full text-primary scale-150">
-             <Video className="w-8 h-8" />
-           </div>
-        </div>
-        <h1 className="text-4xl font-bold mb-4">Rendering Cinematic Tour...</h1>
-        <p className="text-muted-foreground max-w-sm mb-8">Combining your room designs with smooth transitions, 4K resolution, and background music.</p>
+  const loadImg = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = "anonymous"
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error("Failed to load design image"))
+      img.src = url.startsWith("http") ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url
+    })
+
+  const generate = useCallback(async () => {
+    if (!rooms.length || isGenerating) return
+    setIsGenerating(true); setProgress(0); setError(null); setVideoUrl(null)
+    
+    try {
+      const canvas = canvasRef.current!
+      canvas.width = VIDEO_W; canvas.height = VIDEO_H
+      const ctx = canvas.getContext("2d")!
+      
+      const mime = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find(m => MediaRecorder.isTypeSupported(m)) || "video/webm"
+      const chunks: BlobPart[] = []
+      const stream = canvas.captureStream(FPS)
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 25_000_000 })
+      
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+      const blobPromise = new Promise<Blob>(res => recorder.onstop = () => res(new Blob(chunks, { type: mime })))
+      
+      recorder.start(200)
+
+      for (let i = 0; i < rooms.length; i++) {
+        const room = rooms[i]
+        const finalImg = await loadImg(room.afterUrl)
         
-        <div className="w-full max-w-md h-2 bg-secondary rounded-full overflow-hidden mb-4">
-           <motion.div 
-             initial={{ width: "0%" }}
-             animate={{ width: "100%" }}
-             transition={{ duration: 3 }}
-             className="h-full bg-primary"
-           />
-        </div>
-        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">72% Rendered</span>
-      </div>
-    )
-  }
+        // INITIAL FRAME (CRITICAL: prevents black/empty stream)
+        ctx.drawImage(finalImg, 0, 0, VIDEO_W, VIDEO_H)
+        
+        setStatus(`Synthesizing motion: ${room.name}...`)
+        
+        let aiVideoSuccess = false
+        try {
+          const vRes = await fetch("/api/generate-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: room.afterUrl })
+          })
+          const vData = await vRes.json()
+          
+          if (vData.video) {
+            const vidEl = document.createElement("video")
+            vidEl.src = vData.video
+            vidEl.crossOrigin = "anonymous"
+            vidEl.muted = true
+            await new Promise(res => { 
+                vidEl.onloadedmetadata = res; 
+                vidEl.onloadeddata = res;
+                setTimeout(res, 2000) // safety timeout
+            })
+
+            const totalFrames = FPS * SECONDS_PER_ROOM
+            vidEl.play()
+            for (let f = 0; f < totalFrames; f++) {
+              ctx.drawImage(vidEl, 0, 0, VIDEO_W, VIDEO_H)
+              const g = ctx.createLinearGradient(0, VIDEO_H * 0.8, 0, VIDEO_H)
+              g.addColorStop(0, "transparent"); g.addColorStop(1, "rgba(0,0,0,0.6)")
+              ctx.fillStyle = g; ctx.fillRect(0, 0, VIDEO_W, VIDEO_H)
+              ctx.fillStyle = "#fff"; ctx.font = "bold 42px serif"
+              ctx.fillText(room.name.toUpperCase(), 80, VIDEO_H - 60)
+              setProgress(Math.round(((i * totalFrames) + f) / (rooms.length * totalFrames) * 100))
+              await new Promise(r => setTimeout(r, 1000/FPS))
+            }
+            aiVideoSuccess = true
+          }
+        } catch (e) {
+          console.warn("AI Video synthesis skipped, using cinematic pan fallback.")
+        }
+
+        // FALLBACK: Cinematic Pan (If AI video fails or key is invalid)
+        if (!aiVideoSuccess) {
+          const totalFrames = FPS * SECONDS_PER_ROOM
+          for (let f = 0; f < totalFrames; f++) {
+            const t = f / totalFrames
+            const eT = ease(t)
+            const scale = 1.05 + eT * 0.1
+            const panX = (eT - 0.5) * 100
+            
+            ctx.fillStyle = "#000"; ctx.fillRect(0, 0, VIDEO_W, VIDEO_H)
+            const iA = finalImg.width / finalImg.height, cA = VIDEO_W / VIDEO_H
+            let dw = VIDEO_W, dh = VIDEO_H
+            if (iA > cA) { dh = VIDEO_H; dw = dh * iA } else { dw = VIDEO_W; dh = dw / iA }
+
+            ctx.drawImage(finalImg, (VIDEO_W - dw * scale) / 2 + panX, (VIDEO_H - dh * scale) / 2, dw * scale, dh * scale)
+            
+            const g = ctx.createLinearGradient(0, VIDEO_H * 0.8, 0, VIDEO_H)
+            g.addColorStop(0, "transparent"); g.addColorStop(1, "rgba(0,0,0,0.6)")
+            ctx.fillStyle = g; ctx.fillRect(0, 0, VIDEO_W, VIDEO_H)
+            
+            ctx.fillStyle = "#fff"; ctx.font = "bold 42px serif"
+            ctx.fillText(room.name.toUpperCase(), 80, VIDEO_H - 60)
+            
+            setProgress(Math.round(((i * totalFrames) + f) / (rooms.length * totalFrames) * 100))
+            await new Promise(r => setTimeout(r, 1000/FPS))
+          }
+        }
+      }
+
+      recorder.stop()
+      const finalBlob = await blobPromise
+      setVideoUrl(URL.createObjectURL(finalBlob))
+      setProgress(100)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setIsGenerating(false); setStatus("")
+    }
+  }, [rooms, isGenerating])
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      <div className="flex items-center justify-between mb-12">
-        <Link href="/dashboard/results" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to Results
+    <div className="min-h-screen bg-[#050505] text-white">
+      <nav className="fixed top-0 w-full z-50 px-6 py-6 flex justify-between items-center backdrop-blur-3xl border-b border-white/5">
+        <Link href="/dashboard/results" className="group flex items-center gap-4 text-white/40 hover:text-[#C5A059] transition-all">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-[#C5A059]/30 transition-all">
+            <ArrowLeft className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em]">Back</span>
         </Link>
-        <div className="flex gap-4">
-           <Button variant="outline" size="sm" className="rounded-xl h-10 px-4 gap-2">
-              <Share2 className="w-4 h-4" /> Share
-           </Button>
-           <Button className="rounded-xl h-10 px-4 gap-2 shadow-lg shadow-primary/20">
-              <Download className="w-4 h-4" /> Download 4K Tour
-           </Button>
+        <div className="flex items-center gap-6">
+           <Film className="w-5 h-5 text-[#C5A059]" />
+           <h1 className="text-sm font-black uppercase tracking-[0.6em] text-white/90">Cinematic <span className="text-[#C5A059]">Tour</span></h1>
         </div>
-      </div>
+        <div className="flex items-center gap-3">
+           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Studio Live</span>
+        </div>
+      </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3">
-          <Card className="glass overflow-hidden relative group aspect-video bg-black shadow-2xl">
-            {/* Main Video Viewport */}
-            <AnimatePresence mode="wait">
-              <motion.img 
-                key={currentIndex}
-                initial={{ opacity: 0, scale: 1.1, x: 20 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                exit={{ opacity: 0, scale: 0.9, x: -20 }}
-                transition={{ duration: 1.5, ease: "easeInOut" }}
-                src={images[currentIndex]} 
-                className="w-full h-full object-cover"
-              />
-            </AnimatePresence>
-            
-            {/* Cinematic Pan Effect Layer */}
-            <motion.div 
-               animate={{ x: [-20, 20] }}
-               transition={{ duration: 5, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-               className="absolute inset-0 bg-black/10 mix-blend-overlay"
-            />
+      <main className="pt-32 pb-20 px-4 md:px-10 max-w-7xl mx-auto grid lg:grid-cols-12 gap-12">
+        <div className="lg:col-span-8 space-y-10">
+          <div className="relative aspect-video rounded-[3rem] overflow-hidden luxury-card border-white/5 group bg-neutral-900 shadow-2xl">
+              {videoUrl ? (
+                <video ref={videoRef} src={videoUrl} autoPlay loop controls className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full relative">
+                  <canvas ref={canvasRef} className="w-full h-full object-cover opacity-60" />
+                  {isGenerating && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+                       <div className="w-32 h-32 relative">
+                          <svg className="w-full h-full rotate-[-90deg]">
+                             <circle cx="64" cy="64" r="60" fill="none" stroke="white" strokeWidth="2" strokeOpacity="0.1" />
+                             <circle cx="64" cy="64" r="60" fill="none" stroke="#C5A059" strokeWidth="4" strokeDasharray="377" strokeDashoffset={377 - (377 * progress) / 100} className="transition-all duration-500" />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center text-xl font-black text-[#C5A059]">
+                             {progress}%
+                          </div>
+                       </div>
+                       <p className="mt-8 text-[10px] font-black uppercase tracking-[0.5em] text-[#C5A059] animate-pulse">{status}</p>
+                    </div>
+                  )}
+                  {!isGenerating && !videoUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                       <Sparkles className="w-12 h-12 text-white/10 animate-pulse" />
+                    </div>
+                  )}
+                </div>
+              )}
+          </div>
 
-            {/* Video Controls Overlay */}
-            <div className="absolute inset-x-0 bottom-0 p-8 pt-20 bg-linear-to-t from-black via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-               <div className="w-full h-1 bg-white/20 rounded-full mb-6 relative cursor-pointer">
-                  <div className="h-full bg-primary rounded-full relative" style={{ width: `${progress}%` }}>
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg" />
-                  </div>
-               </div>
-               
-               <div className="flex items-center justify-between text-white">
-                  <div className="flex items-center gap-6">
-                     <button onClick={() => setCurrentIndex((idx) => (idx - 1 + images.length) % images.length)} className="hover:text-primary transition-colors">
-                        <SkipBack className="w-6 h-6 fill-current" />
-                     </button>
-                     <button onClick={() => setIsPlaying(!isPlaying)} className="w-16 h-16 bg-white rounded-full text-black flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-2xl">
-                        {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 ml-1 fill-current" />}
-                     </button>
-                     <button onClick={() => setCurrentIndex((idx) => (idx + 1) % images.length)} className="hover:text-primary transition-colors">
-                        <SkipForward className="w-6 h-6 fill-current" />
-                     </button>
-                     <div className="flex items-center gap-3 ml-4">
-                        <Volume2 className="w-5 h-5 text-white/70" />
-                        <div className="w-20 h-1 bg-white/20 rounded-full">
-                           <div className="w-3/4 h-full bg-white rounded-full" />
-                        </div>
-                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-6 text-white/70">
-                     <span className="text-sm font-mono tracking-widest">00:08 / 00:24</span>
-                     <Settings className="w-5 h-5 cursor-pointer hover:text-white" />
-                     <Maximize className="w-5 h-5 cursor-pointer hover:text-white" />
-                  </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-8 py-6 border-y border-white/5">
+            <div className="space-y-4">
+               <h2 className="text-3xl font-light uppercase tracking-widest">{rooms[previewIdx]?.name || "Luxury View"}</h2>
+               <div className="flex items-center gap-4">
+                  <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#C5A059]">Neural Motion Synthesis</p>
                </div>
             </div>
-
-            <div className="absolute top-8 left-8 flex items-center gap-3 px-4 py-2 glass rounded-full text-white">
-               <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-               <span className="text-xs font-bold uppercase tracking-widest">Live Experience</span>
-            </div>
-          </Card>
+            {!videoUrl && !isGenerating && (
+              <button 
+                onClick={generate} 
+                className="px-12 py-5 bg-[#C5A059] text-black rounded-3xl font-black text-[10px] uppercase tracking-[0.4em] hover:bg-white transition-all shadow-gold cursor-pointer"
+              >
+                Start Master Generation
+              </button>
+            )}
+            {videoUrl && (
+              <a 
+                href={videoUrl} 
+                download="home-tour.mp4" 
+                className="px-10 py-5 bg-white text-black rounded-3xl font-black text-[10px] uppercase tracking-[0.4em] flex items-center gap-4 hover:bg-[#C5A059] hover:text-white transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4" /> Export Tour
+              </a>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-6">
-           <Card className="p-6 glass border-none">
-              <h3 className="font-bold mb-4 flex items-center gap-2">
-                 <Music className="w-5 h-5 text-primary" /> Audio Tracks
-              </h3>
-              <div className="space-y-2">
-                 {["Lofi Chillhouse", "Modern Minimal", "Premium Cinematic", "Upbeat Interior"].map((t, i) => (
-                    <button key={i} className={`w-full text-left p-3 rounded-xl text-sm transition-all ${i === 2 ? 'bg-primary text-white font-bold' : 'hover:bg-secondary'}`}>
-                       {t}
-                    </button>
-                 ))}
-              </div>
-           </Card>
-
-           <Card className="p-6 glass border-none">
-              <h3 className="font-bold mb-4 flex items-center gap-2">
-                 Video Settings
-              </h3>
-              <div className="space-y-4">
-                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Transition Speed</span>
-                    <span className="text-xs font-bold bg-secondary px-2 py-1 rounded-md">2.5s</span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Resolution</span>
-                    <span className="text-xs font-bold bg-secondary px-2 py-1 rounded-md">4K UHD</span>
-                 </div>
-                 <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Pan Intensity</span>
-                    <span className="text-xs font-bold bg-secondary px-2 py-1 rounded-md">High</span>
-                 </div>
-              </div>
-           </Card>
+        <div className="lg:col-span-4 space-y-8">
+           <div className="flex items-center gap-4 text-white/40 mb-6">
+              <LayoutGrid className="w-4 h-4" />
+              <span className="text-[10px] font-black uppercase tracking-[0.4em]">Protocol Stacks</span>
+           </div>
+           <div className="space-y-6">
+              {rooms.map((room, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => setPreviewIdx(i)}
+                  className={`w-full group relative aspect-[16/7] rounded-[2rem] overflow-hidden border-2 transition-all duration-700 cursor-pointer ${previewIdx === i ? "border-[#C5A059] scale-[1.02]" : "border-white/5 opacity-40 hover:opacity-100"}`}
+                >
+                  <img src={room.afterUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-6 flex flex-col justify-end text-left">
+                     <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{room.name}</span>
+                  </div>
+                </button>
+              ))}
+           </div>
         </div>
-      </div>
+      </main>
+      
+      {error && (
+        <div className="fixed bottom-10 left-10 right-10 p-8 bg-red-950/20 border border-red-500/20 rounded-3xl text-red-500 text-center text-[10px] uppercase tracking-[0.4em] font-black">
+          Error: {error}
+        </div>
+      )}
     </div>
   )
 }
