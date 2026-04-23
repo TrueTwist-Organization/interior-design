@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Cinematic Interior Viewer</title>
+    
+    <!-- Pannellum Core CSS & JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    
+    <!-- Google Fonts for Premium Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #080808;
+            --accent-gold: #D4AF37;
+            --text-light: #F0F0F0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 
+         * Exact Container Sizes Based on Requirements 
+         */
+        .viewer-container {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            height: 640px; /* Default */
+            border-radius: 28px;
+            overflow: hidden;
+            margin: auto;
+            background: #000;
+            
+            /* Premium Shadow & Gold Accent Line */
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(212, 175, 55, 0.2);
+            transition: box-shadow 0.4s ease;
+        }
+
+        .viewer-container:hover {
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 1), 0 0 0 1px rgba(212, 175, 55, 0.5);
+        }
+
+        /* Responsive Device Heights */
+        @media (min-width: 1400px) {
+            .viewer-container { height: 700px; } /* Desktop */
+        }
+        
+        @media (max-width: 1399px) and (min-width: 1024px) {
+            .viewer-container { height: 620px; } /* Laptop */
+        }
+        
+        @media (max-width: 768px) {
+            .viewer-container { 
+                height: 420px; /* Mobile */
+                width: 95%;
+                border-radius: 20px; 
+            }
+        }
+
+        /* 
+         * Exact Image Quality CSS Requirement
+         */
+        img, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: auto;
+            filter: none;
+        }
+
+        /* Hide Default Pannellum UI */
+        .pnlm-controls-container, .pnlm-load-box, .pnlm-about-msg { 
+            display: none !important; 
+        }
+
+        #panorama-view {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        #panorama-view:active {
+            cursor: grabbing;
+        }
+
+        /* 
+         * Premium Custom UI Controls 
+         */
+        .custom-ui-panel {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            pointer-events: none;
+        }
+
+        .viewer-container.is-ready .custom-ui-panel {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .ui-btn {
+            background: rgba(15, 15, 15, 0.7);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: var(--accent-gold);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .ui-btn:hover {
+            background: rgba(212, 175, 55, 0.2);
+            border-color: var(--accent-gold);
+            transform: scale(1.05);
+        }
+
+        .ui-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        /* Smooth Loading Spinner */
+        .loader-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            z-index: 8;
+            border: 3px solid transparent;
+            border-top-color: var(--accent-gold);
+            border-right-color: rgba(212, 175, 55, 0.3);
+            border-radius: 50%;
+            animation: loader-spin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+
+        @keyframes loader-spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="viewer-container" id="viewerContainer">
+        
+        <div class="loader-ring" id="loader"></div>
+
+        <!-- The Pannellum Mount Point -->
+        <div id="panorama-view"></div>
+
+        <!-- Premium Custom UI -->
+        <div class="custom-ui-panel">
+            <button class="ui-btn" id="btnReset" title="Reset View">
+                <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+            </button>
+            <button class="ui-btn" id="btnFullscreen" title="Fullscreen">
+                <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * The exact flat image source to be used.
+         * Note: Replace 'YOUR_SECOND_IMAGE.jpg' with the actual file path or URL of your image.
+         */
+        const SOURCE_IMAGE = "YOUR_SECOND_IMAGE.jpg";
+
+        // DOM Elements
+        const viewerContainer = document.getElementById('viewerContainer');
+        const panoramaView = document.getElementById('panorama-view');
+        const loader = document.getElementById('loader');
+        
+        let viewerInstance = null;
+
+        // Smart Logic: Detect Image Type via Aspect Ratio
+        function detectImageType(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    const ratio = this.width / this.height;
+                    // Real equirectangular panoramas are strictly 2:1. 
+                    // < 1.8 indicates a standard flat wide photo.
+                    resolve({
+                        isPanorama: ratio >= 1.8,
+                        width: this.width,
+                        height: this.height
+                    });
+                };
+                img.onerror = () => resolve({ isPanorama: false });
+                img.src = url;
+            });
+        }
+
+        async function initViewer() {
+            const imgData = await detectImageType(SOURCE_IMAGE);
+
+            // Base configuration shared across both logic branches
+            const baseConfig = {
+                type: "equirectangular",
+                panorama: SOURCE_IMAGE,
+                autoLoad: true,
+                showControls: false,
+                mouseZoom: true,
+                keyboardZoom: true,
+                friction: 0.15, // Premium smooth inertia motion
+            };
+
+            if (!imgData.isPanorama) {
+                // FLAT PHOTO LOGIC: Cinematic Limited Motion
+                // Heavily prevents circular distortion, fish-eye, and stretching
+                console.log("Flat image detected. Applying cinematic motion constraints.");
+                Object.assign(baseConfig, {
+                    hfov: 125,          // Natural room fit
+                    minHfov: 105,       // Max zoom in
+                    maxHfov: 135,       // Max zoom out
+                    yaw: 0,
+                    minYaw: -18,        // Tiny left pan
+                    maxYaw: 18,         // Tiny right pan
+                    pitch: 0,
+                    minPitch: -4,       // Tiny up tilt
+                    maxPitch: 4         // Tiny down tilt
+                });
+            } else {
+                // REAL PANORAMA LOGIC
+                console.log("Real panorama detected. Enabling full 360 mode automatically.");
+                Object.assign(baseConfig, {
+                    hfov: 110,
+                    minHfov: 50,
+                    maxHfov: 120,
+                    // No pitch or yaw restrictions
+                });
+            }
+
+            // Mount the viewer
+            viewerInstance = pannellum.viewer('panorama-view', baseConfig);
+
+            // Fade in effect
+            viewerInstance.on('load', () => {
+                loader.style.display = 'none';
+                panoramaView.style.opacity = '1';
+                viewerContainer.classList.add('is-ready');
+            });
+
+            // Error handler
+            viewerInstance.on('error', (err) => {
+                console.error("Viewer error:", err);
+                loader.style.display = 'none';
+                panoramaView.style.opacity = '1';
+                panoramaView.innerHTML = '<div style="color:#ff6b6b; font-family: Inter, sans-serif; text-align:center; padding-top:20%;">Error loading image. Please check the YOUR_SECOND_IMAGE.jpg path.</div>';
+            });
+            
+            setupControls();
+        }
+
+        // Custom UI Bindings
+        function setupControls() {
+            // Smooth Reset
+            document.getElementById('btnReset').addEventListener('click', () => {
+                if (viewerInstance) {
+                    viewerInstance.setPitch(0, 1000);
+                    viewerInstance.setYaw(0, 1000);
+                    // Reset back to exactly the natural fit
+                    viewerInstance.setHfov(125, 1000); 
+                }
+            });
+
+            // Fullscreen
+            document.getElementById('btnFullscreen').addEventListener('click', () => {
+                if (viewerInstance) {
+                    viewerInstance.toggleFullscreen();
+                }
+            });
+        }
+
+        // Initialize when the page loads
+        window.addEventListener('load', initViewer);
+    </script>
+</body>
+</html>

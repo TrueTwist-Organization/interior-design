@@ -1,260 +1,157 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Download, ArrowLeft, Film, RefreshCw, ChevronLeft, ChevronRight, Play, LayoutGrid, Sparkles } from "lucide-react"
+import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
+import { ArrowLeft, LayoutGrid, Download } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import dynamic from 'next/dynamic'
 
-const VIDEO_W = 1280, VIDEO_H = 720
-const FPS = 24
-const SECONDS_PER_ROOM = 4
-
-function ease(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
+// Immersive 360 viewer powered by Three.js
+const ThreeSixtyViewer = dynamic(() => import('@/components/ThreeSixtyViewer'), { ssr: false })
 
 export default function VideoGenerationPage() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [rooms, setRooms] = useState<any[]>([])
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [status, setStatus] = useState("")
-  const [videoUrl, setVideoUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [previewIdx, setPreviewIdx] = useState(0)
-
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const [activeAngleIdx, setActiveAngleIdx] = useState(0)
+  const [currentViewUrl, setCurrentViewUrl] = useState<string | null>(null)
 
   useEffect(() => {
+    setMounted(true)
     const d = localStorage.getItem("latest_design")
     if (d) {
-      const parsed = JSON.parse(d)
-      setRooms(parsed.rooms || [])
+      try {
+        const parsed = JSON.parse(d)
+        const initialRooms = parsed.rooms || []
+        setRooms(initialRooms)
+        if (initialRooms.length > 0) {
+          setCurrentViewUrl(initialRooms[0].afterUrl)
+        }
+      } catch (e) {
+        console.error("Failed to parse design data", e)
+        router.push("/dashboard")
+      }
     } else {
       router.push("/dashboard")
     }
   }, [router])
 
-  const loadImg = (url: string): Promise<HTMLImageElement> =>
-    new Promise((resolve, reject) => {
-      const img = new Image()
-      img.crossOrigin = "anonymous"
-      img.onload = () => resolve(img)
-      img.onerror = () => reject(new Error("Failed to load design image"))
-      img.src = url.startsWith("http") ? `/api/image-proxy?url=${encodeURIComponent(url)}` : url
-    })
-
-  const generate = useCallback(async () => {
-    if (!rooms.length || isGenerating) return
-    setIsGenerating(true); setProgress(0); setError(null); setVideoUrl(null)
-    
-    try {
-      const canvas = canvasRef.current!
-      canvas.width = VIDEO_W; canvas.height = VIDEO_H
-      const ctx = canvas.getContext("2d")!
-      
-      const mime = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find(m => MediaRecorder.isTypeSupported(m)) || "video/webm"
-      const chunks: BlobPart[] = []
-      const stream = canvas.captureStream(FPS)
-      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 25_000_000 })
-      
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
-      const blobPromise = new Promise<Blob>(res => recorder.onstop = () => res(new Blob(chunks, { type: mime })))
-      
-      recorder.start(200)
-
-      for (let i = 0; i < rooms.length; i++) {
-        const room = rooms[i]
-        const finalImg = await loadImg(room.afterUrl)
-        
-        // INITIAL FRAME (CRITICAL: prevents black/empty stream)
-        ctx.drawImage(finalImg, 0, 0, VIDEO_W, VIDEO_H)
-        
-        setStatus(`Synthesizing motion: ${room.name}...`)
-        
-        let aiVideoSuccess = false
-        try {
-          const vRes = await fetch("/api/generate-video", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image: room.afterUrl })
-          })
-          const vData = await vRes.json()
-          
-          if (vData.video) {
-            const vidEl = document.createElement("video")
-            vidEl.src = vData.video
-            vidEl.crossOrigin = "anonymous"
-            vidEl.muted = true
-            await new Promise(res => { 
-                vidEl.onloadedmetadata = res; 
-                vidEl.onloadeddata = res;
-                setTimeout(res, 2000) // safety timeout
-            })
-
-            const totalFrames = FPS * SECONDS_PER_ROOM
-            vidEl.play()
-            for (let f = 0; f < totalFrames; f++) {
-              ctx.drawImage(vidEl, 0, 0, VIDEO_W, VIDEO_H)
-              const g = ctx.createLinearGradient(0, VIDEO_H * 0.8, 0, VIDEO_H)
-              g.addColorStop(0, "transparent"); g.addColorStop(1, "rgba(0,0,0,0.6)")
-              ctx.fillStyle = g; ctx.fillRect(0, 0, VIDEO_W, VIDEO_H)
-              ctx.fillStyle = "#fff"; ctx.font = "bold 42px serif"
-              ctx.fillText(room.name.toUpperCase(), 80, VIDEO_H - 60)
-              setProgress(Math.round(((i * totalFrames) + f) / (rooms.length * totalFrames) * 100))
-              await new Promise(r => setTimeout(r, 1000/FPS))
-            }
-            aiVideoSuccess = true
-          }
-        } catch (e) {
-          console.warn("AI Video synthesis skipped, using cinematic pan fallback.")
-        }
-
-        // FALLBACK: Cinematic Pan (If AI video fails or key is invalid)
-        if (!aiVideoSuccess) {
-          const totalFrames = FPS * SECONDS_PER_ROOM
-          for (let f = 0; f < totalFrames; f++) {
-            const t = f / totalFrames
-            const eT = ease(t)
-            const scale = 1.05 + eT * 0.1
-            const panX = (eT - 0.5) * 100
-            
-            ctx.fillStyle = "#000"; ctx.fillRect(0, 0, VIDEO_W, VIDEO_H)
-            const iA = finalImg.width / finalImg.height, cA = VIDEO_W / VIDEO_H
-            let dw = VIDEO_W, dh = VIDEO_H
-            if (iA > cA) { dh = VIDEO_H; dw = dh * iA } else { dw = VIDEO_W; dh = dw / iA }
-
-            ctx.drawImage(finalImg, (VIDEO_W - dw * scale) / 2 + panX, (VIDEO_H - dh * scale) / 2, dw * scale, dh * scale)
-            
-            const g = ctx.createLinearGradient(0, VIDEO_H * 0.8, 0, VIDEO_H)
-            g.addColorStop(0, "transparent"); g.addColorStop(1, "rgba(0,0,0,0.6)")
-            ctx.fillStyle = g; ctx.fillRect(0, 0, VIDEO_W, VIDEO_H)
-            
-            ctx.fillStyle = "#fff"; ctx.font = "bold 42px serif"
-            ctx.fillText(room.name.toUpperCase(), 80, VIDEO_H - 60)
-            
-            setProgress(Math.round(((i * totalFrames) + f) / (rooms.length * totalFrames) * 100))
-            await new Promise(r => setTimeout(r, 1000/FPS))
-          }
-        }
-      }
-
-      recorder.stop()
-      const finalBlob = await blobPromise
-      setVideoUrl(URL.createObjectURL(finalBlob))
-      setProgress(100)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setIsGenerating(false); setStatus("")
-    }
-  }, [rooms, isGenerating])
+  if (!mounted) return null
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-[#C5A059]/30 font-sans overflow-x-hidden">
+      {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 px-6 py-6 flex justify-between items-center backdrop-blur-3xl border-b border-white/5">
         <Link href="/dashboard/results" className="group flex items-center gap-4 text-white/40 hover:text-[#C5A059] transition-all">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-[#C5A059]/30 transition-all">
             <ArrowLeft className="w-4 h-4" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em]">Back</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] hidden sm:block">Back to Gallery</span>
         </Link>
-        <div className="flex items-center gap-6">
-           <Film className="w-5 h-5 text-[#C5A059]" />
-           <h1 className="text-sm font-black uppercase tracking-[0.6em] text-white/90">Cinematic <span className="text-[#C5A059]">Tour</span></h1>
+        <div className="flex items-center gap-4 sm:gap-6">
+          <LayoutGrid className="w-5 h-5 sm:w-6 sm:h-6 text-[#C5A059] hidden sm:block" />
+          <h1 className="text-[10px] sm:text-sm font-black uppercase tracking-[0.3em] sm:tracking-[0.6em] text-white/90 text-center">
+            360° Vision <br className="sm:hidden" />
+            <span className="text-[#C5A059]">Interactive</span>
+          </h1>
         </div>
         <div className="flex items-center gap-3">
-           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-           <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Studio Live</span>
+          <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] hidden sm:block">3D Engine Online</span>
         </div>
       </nav>
 
-      <main className="pt-32 pb-20 px-4 md:px-10 max-w-7xl mx-auto grid lg:grid-cols-12 gap-12">
-        <div className="lg:col-span-8 space-y-10">
-          <div className="relative aspect-video rounded-[3rem] overflow-hidden luxury-card border-white/5 group bg-neutral-900 shadow-2xl">
-              {videoUrl ? (
-                <video ref={videoRef} src={videoUrl} autoPlay loop controls className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full relative">
-                  <canvas ref={canvasRef} className="w-full h-full object-cover opacity-60" />
-                  {isGenerating && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
-                       <div className="w-32 h-32 relative">
-                          <svg className="w-full h-full rotate-[-90deg]">
-                             <circle cx="64" cy="64" r="60" fill="none" stroke="white" strokeWidth="2" strokeOpacity="0.1" />
-                             <circle cx="64" cy="64" r="60" fill="none" stroke="#C5A059" strokeWidth="4" strokeDasharray="377" strokeDashoffset={377 - (377 * progress) / 100} className="transition-all duration-500" />
-                          </svg>
-                          <div className="absolute inset-0 flex items-center justify-center text-xl font-black text-[#C5A059]">
-                             {progress}%
-                          </div>
-                       </div>
-                       <p className="mt-8 text-[10px] font-black uppercase tracking-[0.5em] text-[#C5A059] animate-pulse">{status}</p>
-                    </div>
-                  )}
-                  {!isGenerating && !videoUrl && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                       <Sparkles className="w-12 h-12 text-white/10 animate-pulse" />
-                    </div>
-                  )}
-                </div>
-              )}
+      <main className="pt-28 sm:pt-32 pb-20 px-4 md:px-10 max-w-7xl mx-auto grid lg:grid-cols-12 gap-8 lg:gap-12">
+        {/* Main 3D Viewer Section */}
+        <div className="lg:col-span-8 space-y-8 sm:space-y-10">
+          <div className="relative w-full aspect-[4/3] md:aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden luxury-card border border-white/10 group bg-[#0A0A0A] shadow-[0_0_100px_rgba(197,160,89,0.05)] transition-all duration-700">
+            {currentViewUrl ? (
+               <ThreeSixtyViewer 
+                 imageUrls={rooms[previewIdx]?.angles ? rooms[previewIdx].angles.map((a: any) => a.afterUrl) : [currentViewUrl]} 
+                 activeAngleIdx={activeAngleIdx} 
+               />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-black/40">
+                <div className="w-10 h-10 border-2 border-[#C5A059] border-t-transparent rounded-full animate-spin" />
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#C5A059]">Initializing 3D Module...</p>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-8 py-6 border-y border-white/5">
-            <div className="space-y-4">
-               <h2 className="text-3xl font-light uppercase tracking-widest">{rooms[previewIdx]?.name || "Luxury View"}</h2>
-               <div className="flex items-center gap-4">
-                  <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#C5A059]">Neural Motion Synthesis</p>
-               </div>
-            </div>
-            {!videoUrl && !isGenerating && (
-              <button 
-                onClick={generate} 
-                className="px-12 py-5 bg-[#C5A059] text-black rounded-3xl font-black text-[10px] uppercase tracking-[0.4em] hover:bg-white transition-all shadow-gold cursor-pointer"
-              >
-                Start Master Generation
-              </button>
-            )}
-            {videoUrl && (
-              <a 
-                href={videoUrl} 
-                download="home-tour.mp4" 
-                className="px-10 py-5 bg-white text-black rounded-3xl font-black text-[10px] uppercase tracking-[0.4em] flex items-center gap-4 hover:bg-[#C5A059] hover:text-white transition-all cursor-pointer"
-              >
-                <Download className="w-4 h-4" /> Export Tour
-              </a>
-            )}
-          </div>
+          {/* Download Button */}
+           <div className="flex justify-center pt-4">
+             <button
+               onClick={() => {
+                 if (!currentViewUrl) return;
+                 const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(currentViewUrl)}`;
+                 fetch(proxyUrl)
+                   .then(res => res.blob())
+                   .then(blob => {
+                     const blobUrl = URL.createObjectURL(blob);
+                     const a = document.createElement('a');
+                     a.href = blobUrl;
+                     a.download = `interior-design-${Date.now()}.jpg`;
+                     document.body.appendChild(a);
+                     a.click();
+                     document.body.removeChild(a);
+                     URL.revokeObjectURL(blobUrl);
+                   })
+                   .catch(() => {
+                     window.open(currentViewUrl, '_blank');
+                   });
+               }}
+               className="group relative flex items-center gap-4 px-10 py-5 rounded-full bg-gradient-to-r from-[#C5A059] via-[#E0C878] to-[#C5A059] text-[#050505] font-black text-xs uppercase tracking-[0.3em] shadow-[0_4px_30px_rgba(197,160,89,0.35)] hover:shadow-[0_8px_50px_rgba(197,160,89,0.55)] hover:-translate-y-1 active:translate-y-0 transition-all duration-400 overflow-hidden"
+             >
+               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+               <Download className="w-5 h-5 relative z-10 group-hover:translate-y-0.5 transition-transform duration-300" />
+               <span className="relative z-10">Download</span>
+             </button>
+           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-8">
-           <div className="flex items-center gap-4 text-white/40 mb-6">
-              <LayoutGrid className="w-4 h-4" />
-              <span className="text-[10px] font-black uppercase tracking-[0.4em]">Protocol Stacks</span>
-           </div>
-           <div className="space-y-6">
-              {rooms.map((room, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => setPreviewIdx(i)}
-                  className={`w-full group relative aspect-[16/7] rounded-[2rem] overflow-hidden border-2 transition-all duration-700 cursor-pointer ${previewIdx === i ? "border-[#C5A059] scale-[1.02]" : "border-white/5 opacity-40 hover:opacity-100"}`}
-                >
-                  <img src={room.afterUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-1000" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent p-6 flex flex-col justify-end text-left">
-                     <span className="text-[9px] font-black uppercase tracking-widest text-white/60">{room.name}</span>
-                  </div>
-                </button>
-              ))}
-           </div>
+        {/* Sidebar: View Selection */}
+        <div className="lg:col-span-4 space-y-10">
+          <div className="flex items-center justify-between text-white/20 mb-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.6em]">Vision Gallery</span>
+            <span className="text-[10px] font-black text-[#C5A059]">{rooms.length} SPACES</span>
+          </div>
+
+          <div className="space-y-8 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
+            {rooms.map((room: any, i: number) => (
+              <div key={i} className="space-y-4">
+                <div className="flex items-center gap-4 px-4">
+                  <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#C5A059]">0{i+1}</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">{room.name}</span>
+                  <div className="h-px flex-1 bg-white/5" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {(room.angles || [{ afterUrl: room.afterUrl, label: "Center View" }]).map((angle: any, aIdx: number) => (
+                    <button
+                      key={aIdx}
+                      onClick={() => { 
+                        setPreviewIdx(i); 
+                        setActiveAngleIdx(aIdx);
+                        setCurrentViewUrl(angle.afterUrl);
+                      }}
+                      className={`group relative aspect-video rounded-[1.5rem] overflow-hidden border-2 transition-all duration-500 ${currentViewUrl === angle.afterUrl ? "border-[#C5A059] shadow-[0_0_30px_rgba(197,160,89,0.3)]" : "border-white/5 opacity-40 hover:opacity-100"}`}
+                    >
+                      <img src={angle.afterUrl} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-white/80">{angle.label || `Angle ${aIdx + 1}`}</span>
+                      </div>
+                      {currentViewUrl === angle.afterUrl && (
+                        <div className="absolute top-2 right-2 w-2 h-2 bg-[#C5A059] rounded-full animate-pulse" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </main>
-      
-      {error && (
-        <div className="fixed bottom-10 left-10 right-10 p-8 bg-red-950/20 border border-red-500/20 rounded-3xl text-red-500 text-center text-[10px] uppercase tracking-[0.4em] font-black">
-          Error: {error}
-        </div>
-      )}
     </div>
   )
 }

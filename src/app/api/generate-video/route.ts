@@ -22,14 +22,21 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        image: image, // NVIDIA usually handles base64 or URL
+        image: image,
         seed: 0,
         cfg_scale: 2.5,
         motion_bucket_id: 127
       }),
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error(">>> [VIDEO API] Parse Error. Raw response:", responseText);
+      throw new Error("NVIDIA API returned invalid JSON response.");
+    }
 
     if (!response.ok) {
       console.error(">>> [VIDEO API] NVIDIA Error:", data);
@@ -37,10 +44,10 @@ export async function POST(req: Request) {
     }
 
     // NVIDIA NIM returns the video as a base64 or a direct link depending on the exact version
-    // Usually it's { "artifacts": [{ "base64": "..." }] } or { "video": "url" }
     const videoData = data.artifacts?.[0]?.base64 || data.video || data.url;
 
     if (!videoData) {
+      console.error(">>> [VIDEO API] Unexpected Response Structure:", data);
       throw new Error("No video content returned from NVIDIA");
     }
 

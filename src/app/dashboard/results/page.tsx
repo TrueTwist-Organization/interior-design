@@ -18,7 +18,8 @@ export default function ResultsPage() {
       const saved = localStorage.getItem("latest_design")
       if (saved) {
         const parsed = JSON.parse(saved)
-        const enhancedRooms = parsed.rooms.map((room: any) => ({
+        const rooms = parsed.rooms || []
+        const enhancedRooms = rooms.map((room: any) => ({
           ...room,
           before: room.beforeUrl,
           after: room.afterUrl,
@@ -127,11 +128,11 @@ export default function ResultsPage() {
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-slate-500 hover:text-[#C5A059] mb-2 transition-colors text-xs uppercase font-bold tracking-widest mx-auto sm:mx-0">
             <ArrowLeft className="w-3 h-3" /> Back to Upload
           </Link>
-          <h1 className="text-3xl md:text-5xl font-light font-display text-white leading-tight">Your AI Design <span className="text-[#C5A059] font-bold">Results</span></h1>
+          <h1 className="text-3xl md:text-5xl font-light font-display text-white leading-tight">Neural Master <span className="text-[#C5A059] font-bold">Designs</span></h1>
           <p className="text-slate-500 tracking-wide text-[10px] md:text-xs uppercase font-bold">
             Style: <span className="text-white">{designData?.style || "Modern"}</span> | 
             Property: <span className="text-white">{designData?.bhk || "2 BHK"}</span> | 
-            Results: <span className="text-[#C5A059]">{activeRooms.length} Angles</span>
+            Results: <span className="text-[#C5A059]">{activeRooms.length} High-End Designs</span>
           </p>
         </div>
         
@@ -167,9 +168,11 @@ export default function ResultsPage() {
               key={idx}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
+              whileHover={{ y: -10, scale: 1.02 }}
+              transition={{ delay: idx * 0.1, type: "spring", stiffness: 300 }}
+              className="perspective-1000"
             >
-              <Card className="bg-[#0F0F0F] border-white/10 group overflow-hidden rounded-[2rem] shadow-2xl transition-all hover:border-[#C5A059]/30">
+              <Card className="bg-[#0F0F0F] border-white/10 group overflow-hidden rounded-[2rem] shadow-2xl transition-all hover:border-[#C5A059]/30 hover:shadow-[#C5A059]/10">
                 <div className="p-2">
                     <InternalSlider 
                       before={room.before || room.beforeUrl} 
@@ -181,8 +184,8 @@ export default function ResultsPage() {
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="font-bold text-base md:text-lg text-white">{room.name}</h3>
                       <div className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059] animate-pulse" />
-                        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest">AI Standard</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#C5A059]" />
+                        <span className="text-[9px] text-[#C5A059] uppercase font-black tracking-widest">Elite AI Design</span>
                       </div>
                     </div>
 
@@ -191,7 +194,7 @@ export default function ResultsPage() {
                         onClick={() => handleSingleDownload(room.after || room.afterUrl, room.name)}
                         className="flex-1 rounded-xl h-10 px-0 bg-[#C5A059] text-black font-black uppercase tracking-widest text-[9px] hover:bg-white transition-all shadow-lg shadow-[#C5A059]/10"
                       >
-                        Single Download
+                        Download HD
                       </button>
                       <Link href="/dashboard" className="flex-1">
                         <Button variant="outline" className="w-full rounded-xl h-10 px-0 bg-transparent border-white/10 text-white hover:bg-white/5 hover:text-white text-[9px] uppercase font-black tracking-widest">Regenerate</Button>

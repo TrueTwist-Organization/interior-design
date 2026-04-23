@@ -13,6 +13,7 @@
     "@panzoom/panzoom": "^4.6.2",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
+    "@types/three": "^0.184.0",
     "axios": "^1.15.0",
     "cloudinary": "^2.9.0",
     "clsx": "^2.1.1",
@@ -30,6 +31,7 @@
     "three": "^0.183.2"
   },
   "devDependencies": {
+    "@runwayml/sdk": "^3.20.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

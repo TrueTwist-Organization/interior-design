@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium 360° Real Estate Showcase</title>
+    
+    <!-- Pannellum Core CSS & JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    
+    <!-- Google Fonts for Premium Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #050505;
+            --accent-gold: #C5A059;
+            --text-light: #F8F8F8;
+            --panel-bg: rgba(15, 15, 15, 0.85);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            /* Premium gradient background */
+            background-image: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+        }
+
+        /* 
+         * Typography & Header
+         */
+        .showcase-header {
+            text-align: center;
+            margin-bottom: 30px;
+            z-index: 2;
+        }
+
+        .showcase-header h1 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 2.8rem;
+            margin: 0 0 10px 0;
+            letter-spacing: 1px;
+            color: var(--text-light);
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .showcase-header p {
+            font-weight: 400;
+            color: var(--accent-gold);
+            margin: 0;
+            font-size: 0.95rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        /* 
+         * Main Container Styling 
+         */
+        .viewer-wrapper {
+            position: relative;
+            width: 92vw;
+            max-width: 1400px;
+            height: 70vh;
+            min-height: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+            /* Luxury Shadow Design */
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(197, 160, 89, 0.25);
+            transition: box-shadow 0.5s ease;
+        }
+
+        .viewer-wrapper:hover {
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 1), 0 0 0 1px rgba(197, 160, 89, 0.6);
+        }
+
+        #panorama-view {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            cursor: grab;
+        }
+
+        #panorama-view:active {
+            cursor: grabbing;
+        }
+
+        /* Optimize Image Quality rendering for Canvas */
+        .pnlm-render-container {
+            image-rendering: high-quality;
+            image-rendering: -webkit-optimize-contrast;
+            transform: translateZ(0); /* Force GPU Accel */
+        }
+
+        /* Hide Default Pannellum UI entirely */
+        .pnlm-controls-container, .pnlm-load-box, .pnlm-about-msg { 
+            display: none !important; 
+        }
+
+        /* 
+         * Premium Custom UI Panel 
+         */
+        .custom-ui-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            padding: 12px 24px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 50px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .ui-btn {
+            background: transparent;
+            border: none;
+            color: #E0E0E0;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .ui-btn:hover, .ui-btn.active {
+            background: rgba(197, 160, 89, 0.15);
+            color: var(--accent-gold);
+            transform: translateY(-2px);
+        }
+
+        .ui-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        .ui-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.15);
+            margin: auto 5px;
+        }
+
+        /* 
+         * Loading & Error States Overlay
+         */
+        .status-overlay {
+            position: absolute;
+            inset: 0;
+            background: #050505;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            transition: opacity 0.8s ease;
+        }
+
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(197, 160, 89, 0.15);
+            border-top-color: var(--accent-gold);
+            border-radius: 50%;
+            animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            margin-bottom: 25px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-text {
+            color: var(--accent-gold);
+            font-family: 'Playfair Display', serif;
+            font-size: 1.3rem;
+            letter-spacing: 1px;
+        }
+
+        .error-message {
+            display: none;
+            color: #ff5e5e;
+            text-align: center;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .error-icon {
+            width: 54px;
+            height: 54px;
+            margin-bottom: 16px;
+            fill: #ff5e5e;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .showcase-header h1 { font-size: 2rem; }
+            .viewer-wrapper { 
+                height: 55vh; 
+                width: 100vw; 
+                border-radius: 0; 
+                border-left: none;
+                border-right: none;
+            }
+            .custom-ui-panel { 
+                bottom: 20px; 
+                padding: 8px 16px; 
+                gap: 10px;
+            }
+            .ui-btn { width: 40px; height: 40px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="showcase-header">
+        <h1>Master Bedroom Suite</h1>
+        <p>Immersive 8K Experience</p>
+    </div>
+
+    <div class="viewer-wrapper" id="viewerWrapper">
+        
+        <!-- Loading & Error Overlay -->
+        <div class="status-overlay" id="statusOverlay">
+            <div class="loader-spinner" id="loaderSpinner"></div>
+            <div class="status-text" id="statusText">Loading High Resolution Assets...</div>
+            
+            <div class="error-message" id="errorMessage">
+                <svg class="error-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                <div class="status-text" style="color: #ff5e5e;">Failed to load panorama.</div>
+                <p style="color: #aaa; font-family: 'Inter', sans-serif; font-size: 0.95rem; margin-top: 12px; line-height: 1.5;">Please verify your high-resolution image URL and ensure your connection is stable.</p>
+            </div>
+        </div>
+
+        <!-- The Pannellum Mount Point -->
+        <div id="panorama-view"></div>
+
+        <!-- Premium Custom UI -->
+        <div class="custom-ui-panel">
+            <button class="ui-btn" id="btnZoomIn" title="Zoom In">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/><path d="M12 10h-2v2H9v-2H7V9h2V7h1v2h2v1z"/></svg>
+            </button>
+            <button class="ui-btn" id="btnZoomOut" title="Zoom Out">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM7 9h5v1H7z"/></svg>
+            </button>
+            
+            <div class="ui-divider"></div>
+            
+            <button class="ui-btn" id="btnAutoRotate" title="Auto Rotate">
+                <!-- Rotate Icon -->
+                <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+            </button>
+            
+            <button class="ui-btn" id="btnReset" title="Reset View">
+                <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+            
+            <div class="ui-divider"></div>
+            
+            <button class="ui-btn" id="btnFullscreen" title="Fullscreen">
+                <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Provide your high-resolution 8K equirectangular image URL here.
+         * The higher the resolution, the sharper it looks.
+         */
+        const HIGH_RES_IMAGE_URL = 'https://pannellum.org/images/alma.jpg'; // Example high-res panorama
+
+        // DOM Elements
+        const statusOverlay = document.getElementById('statusOverlay');
+        const loaderSpinner = document.getElementById('loaderSpinner');
+        const statusText = document.getElementById('statusText');
+        const errorMessage = document.getElementById('errorMessage');
+        
+        let viewerInstance = null;
+        let isAutoRotating = false;
+        const ROTATION_SPEED = 2; // Degrees per second
+
+        // Initialize Pannellum
+        function initRealEstateViewer() {
+            viewerInstance = pannellum.viewer('panorama-view', {
+                type: "equirectangular",
+                panorama: HIGH_RES_IMAGE_URL,
+                
+                // Requested Settings for Premium Feel
+                autoLoad: true,
+                hfov: 110,           // Natural starting zoom
+                minHfov: 50,         // Prevent extreme zoom-in (avoids pixelation/blur)
+                maxHfov: 120,        // Prevent extreme zoom-out (avoids fisheye edge distortion)
+                pitch: 0,
+                yaw: 0,
+                
+                // Controls
+                showZoomCtrl: false,       // Handled by custom UI
+                showFullscreenCtrl: false, // Handled by custom UI
+                mouseZoom: true,           // Mouse wheel smooth zoom
+                keyboardZoom: true,        // Arrow keys
+                
+                // Physics / Interaction
+                friction: 0.15,            // Inertia makes drag feel premium and heavy
+                autoRotateInactivityDelay: 5000, // Optional: start auto-rotate after 5s idle
+            });
+
+            // Handle successful load
+            viewerInstance.on('load', () => {
+                statusOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    statusOverlay.style.display = 'none';
+                }, 800);
+            });
+
+            // Handle loading errors (Fallback message)
+            viewerInstance.on('error', (err) => {
+                console.error("Panorama Error:", err);
+                loaderSpinner.style.display = 'none';
+                statusText.style.display = 'none';
+                errorMessage.style.display = 'block';
+            });
+
+            bindCustomUI();
+        }
+
+        // Link Custom HTML Buttons to Pannellum API
+        function bindCustomUI() {
+            // Zoom In
+            document.getElementById('btnZoomIn').addEventListener('click', () => {
+                if (viewerInstance) {
+                    const currentHfov = viewerInstance.getHfov();
+                    viewerInstance.setHfov(currentHfov - 15, 400); // Animate zoom
+                }
+            });
+
+            // Zoom Out
+            document.getElementById('btnZoomOut').addEventListener('click', () => {
+                if (viewerInstance) {
+                    const currentHfov = viewerInstance.getHfov();
+                    viewerInstance.setHfov(currentHfov + 15, 400);
+                }
+            });
+
+            // Auto Rotate Toggle
+            const btnAutoRotate = document.getElementById('btnAutoRotate');
+            btnAutoRotate.addEventListener('click', () => {
+                if (!viewerInstance) return;
+                
+                isAutoRotating = !isAutoRotating;
+                if (isAutoRotating) {
+                    viewerInstance.startAutoRotate(ROTATION_SPEED);
+                    btnAutoRotate.classList.add('active');
+                } else {
+                    viewerInstance.stopAutoRotate();
+                    btnAutoRotate.classList.remove('active');
+                }
+            });
+
+            // Reset Camera smoothly
+            document.getElementById('btnReset').addEventListener('click', () => {
+                if (!viewerInstance) return;
+                
+                viewerInstance.setPitch(0, 1000);
+                viewerInstance.setYaw(0, 1000);
+                viewerInstance.setHfov(110, 1000);
+                
+                if (isAutoRotating) {
+                    viewerInstance.stopAutoRotate();
+                    isAutoRotating = false;
+                    btnAutoRotate.classList.remove('active');
+                }
+            });
+
+            // Fullscreen Toggle
+            document.getElementById('btnFullscreen').addEventListener('click', () => {
+                if (viewerInstance) {
+                    viewerInstance.toggleFullscreen();
+                }
+            });
+
+            // Automatically stop rotation if user clicks/drags to look around
+            viewerInstance.on('mousedown', () => {
+                if (isAutoRotating) {
+                    viewerInstance.stopAutoRotate();
+                    isAutoRotating = false;
+                    btnAutoRotate.classList.remove('active');
+                }
+            });
+        }
+
+        // Boot viewer when DOM is ready
+        window.addEventListener('load', initRealEstateViewer);
+    </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const [selectedBHK, setSelectedBHK] = useState<string | null>(null)
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
   const [customPrompt, setCustomPrompt] = useState("")
+  const [roomPrompts, setRoomPrompts] = useState<Record<string, string>>({})
   const [uploads, setUploads] = useState<Record<string, File[]>>({})
   const [isGenerating, setIsGenerating] = useState(false)
   const [processingStatus, setProcessingStatus] = useState("")
@@ -41,13 +42,13 @@ export default function DashboardPage() {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width, height = img.height;
-          const maxDim = 800;
+          const maxDim = 1440;
           if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
           else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
           canvas.width = width; canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
+          resolve(canvas.toDataURL('image/jpeg', 0.9));
         };
         img.src = e.target?.result as string;
       };
@@ -63,43 +64,18 @@ export default function DashboardPage() {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width, height = img.height;
-          const maxDim = 400;
+          const maxDim = 800;
           if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
           else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
           canvas.width = width; canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.4));
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
         };
         img.src = e.target?.result as string;
       };
       reader.readAsDataURL(file);
     });
-  };
-
-  const buildStagedPrompt = (roomName: string, style: string, stage: number) => {
-    const s = style || "modern luxury";
-    const lower = roomName.toLowerCase();
-    let furniture = "";
-
-    if (stage === 1) {
-      furniture = lower.includes("living") ? "ONLY primary furniture like a designer sofa and coffee table, empty walls" 
-                : lower.includes("bedroom") ? "ONLY a modern king-size bed and wardrobe, empty walls"
-                : lower.includes("kitchen") ? "ONLY basic modern modular cabinetry and a kitchen island"
-                : (lower.includes("cabin") || lower.includes("ceo")) ? "ONLY a massive L-shaped grand executive desk and premium CEO chair"
-                : lower.includes("workstation") ? "ONLY rows of high-end ergonomic office desks and task chairs"
-                : "ONLY primary essential professional furniture";
-    } else {
-      furniture = lower.includes("living") ? "full luxury living room with sofa, coffee table, TV unit, lush area rug, curtains, wall art, and ambient designer lighting"
-                : lower.includes("bedroom") ? "full master bedroom with bed, wardrobe, TV unit, vanity desk, pendant lights, luxury rugs, and floor-to-ceiling curtains"
-                : lower.includes("kitchen") ? "complete professional kitchen suite with bar stools, pendant lighting, professional decor, and premium textures"
-                : (lower.includes("cabin") || lower.includes("ceo")) ? "ultra-premium CEO executive office suite with a massive monolithic designer desk, high-back Italian leather CEO chair, guest seating area with luxury armchairs, floor-to-ceiling wooden library walls with integrated accent lighting, professional workstations with elegant technology, and expansive glass partitions"
-                : lower.includes("workstation") ? "elite corporate workstation area with multiple rows of dual-monitor desks, premium task chairs, MacBook Pro laptops, acoustic ceiling clouds, linear architectural lighting, and floor-to-ceiling windows with a professional view"
-                : lower.includes("conference") ? "grand boardroom with a massive solid wood executive table, luxury leather swivel chairs, integrated media wall, and sophisticated acoustic treatment"
-                : "fully curated luxury architectural interior with professional furniture, high-end hardware like laptops and monitors, and premium corporate textures";
-    }
-
-    return `${s} interior design, ${roomName}, ${furniture}. Professional architectural photography, 8k, realistic, maintain room structure, bright lighting.`;
   };
 
   const handleStartGeneration = async () => {
@@ -114,35 +90,56 @@ export default function DashboardPage() {
       const roomsToProcess = Object.entries(uploads);
       
       for (const [roomName, files] of roomsToProcess) {
+        if (!files || files.length === 0) continue;
+
+        const roomSeed = Math.floor(Math.random() * 2147483647); // Consistency anchor across angles
+        const angleNames = ["North View", "East View", "South View", "West View"];
+        const angles: any[] = [];
+
+        setProcessingStatus(`Analyzing 360° Perspectives for ${roomName}...`);
+
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const angleLabel = files.length > 1 ? ` - Angle ${i + 1}` : "";
-          const dataUri = await compressImage(file);
-          const pureBase64 = dataUri.split(",")[1];
-          const thumbnailUri = await compressForStorage(file);
+          const angleLabel = angleNames[i] || `Angle ${i + 1}`;
           
-          const stages = [];
-          for (let stageNum = 1; stageNum <= 2; stageNum++) {
-            setProcessingStatus(`Designing ${roomName}: Phase ${stageNum}/2...`);
-            const roomPrompt = buildStagedPrompt(roomName, selectedStyle || "Luxury", stageNum);
+          setProcessingStatus(`Synthesizing ${angleLabel}: ${roomName}...`);
+          
+          const thumbnailUri = await compressForStorage(file);
+          const perRoomPrompt = roomPrompts[roomName] || "";
+          const angleDataUri = await compressImage(file);
+          const angleBase64 = angleDataUri.split(",")[1];
 
-            const response = await fetch("/api/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image: pureBase64, prompt: roomPrompt })
-            });
+          const response = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              image: angleBase64,
+              roomType: roomName,
+              style: selectedStyle || "Luxury",
+              prompt: perRoomPrompt,
+              angle: angleLabel,
+              seed: roomSeed 
+            })
+          });
 
-            if (!response.ok) throw new Error("Generation failed at phase " + stageNum);
+          if (!response.ok) continue; // Skip failed angles
+          const data = await response.json();
+          if (data.error) continue;
 
-            const data = await response.json();
-            stages.push(data.image);
-          }
-
-          results.push({
-            name: `${roomName}${angleLabel}`,
+          angles.push({
+            label: angleLabel,
             beforeUrl: thumbnailUri,
-            afterUrl: stages[1], // Final frame
-            allStages: [thumbnailUri, ...stages] // Empty + 2 logic layers (Total 3)
+            afterUrl: data.image
+          });
+        }
+
+        if (angles.length > 0) {
+          results.push({
+            name: roomName,
+            beforeUrl: angles[0].beforeUrl,
+            afterUrl: angles[0].afterUrl,
+            angles: angles,
+            allStages: angles.flatMap(a => [a.beforeUrl, a.afterUrl])
           });
         }
       }
@@ -150,6 +147,7 @@ export default function DashboardPage() {
       localStorage.setItem("latest_design", JSON.stringify({
         style: selectedStyle,
         bhk: selectedBHK,
+        prompt: customPrompt,
         rooms: results
       }));
       router.push("/dashboard/results");
@@ -289,8 +287,7 @@ export default function DashboardPage() {
                                 </div>
                               )}
                            </div>
-                           
-                           <div className="flex sm:flex-col gap-3 overflow-x-auto sm:w-28 scrollbar-hide">
+                                                  <div className="flex sm:flex-col gap-3 overflow-x-auto sm:w-28 scrollbar-hide">
                               {[1, 2, 3].map(i => (
                                 <div key={i} className="relative shrink-0 w-20 h-20 sm:w-auto sm:flex-1 rounded-2xl overflow-hidden border border-white/5 bg-black group hover:border-[#C5A059]/30 cursor-pointer transition-all">
                                   <input type="file" accept="image/*" onChange={(e) => {
@@ -304,16 +301,32 @@ export default function DashboardPage() {
                                       <button onClick={(e) => { e.stopPropagation(); setUploads(prev => ({ ...prev, [room]: prev[room].filter((_, fi) => fi !== i) })) }} className="absolute top-1 right-1 w-5 h-5 bg-black/80 backdrop-blur-md rounded-full flex items-center justify-center text-white text-[8px] z-20">✕</button>
                                     </>
                                   ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                                       <span className="text-white/5 font-black text-xl group-hover:text-[#C5A059]/20 transition-colors">+</span>
+                                      <p className="text-[6px] text-white/20 uppercase font-black tracking-widest">{i === 1 ? "East View" : i === 2 ? "South View" : "West View"}</p>
                                     </div>
                                   )}
                                 </div>
                               ))}
                            </div>
                         </div>
-                      </div>
-                    )
+
+                        {/* Per-Room Directive Input */}
+                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                           <div className="flex items-center gap-2 text-white/20">
+                              <Wand2 className="w-3 h-3 text-[#C5A059]" />
+                              <span className="text-[8px] font-black uppercase tracking-widest">Special Directive for {room}</span>
+                           </div>
+                           <input 
+                             type="text"
+                             value={roomPrompts[room] || ""}
+                             onChange={(e) => setRoomPrompts(prev => ({ ...prev, [room]: e.target.value }))}
+                             placeholder="e.g., 'Navy blue walls', 'L-shaped red sofa', 'Marble floor'..."
+                             className="w-full bg-black/50 border border-white/5 p-4 rounded-xl text-white text-[10px] focus:border-[#C5A059]/30 transition-all outline-none font-light italic"
+                           />
+                        </div>
+                     </div>
+                   )
                   })}
                 </div>
 
@@ -354,14 +367,15 @@ export default function DashboardPage() {
                   ))}
                 </div>
 
-                <div className="pt-8">
-                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 mb-4 block text-center">Custom Directives (Optional)</span>
-                  <textarea value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} placeholder="Enter unique spatial characteristics or specific furniture intents..." className="w-full max-w-2xl mx-auto block bg-white/5 border border-white/5 p-8 text-white text-xs md:text-sm rounded-3xl focus:border-[#C5A059]/50 transition-all outline-none h-32 md:h-40 font-light tracking-wide" />
-                </div>
+
 
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-10 py-12 border-t border-white/5">
                   <button onClick={() => setStep(2)} className="text-white/30 hover:text-white uppercase font-black tracking-[0.4em] text-[10px]">Back</button>
-                  <button onClick={handleStartGeneration} className="w-full sm:w-auto bg-[#C5A059] text-black px-16 py-8 font-black uppercase tracking-[0.4em] hover:bg-white hover:text-[#C5A059] transition-all duration-700 shadow-2xl gold-shadow flex items-center justify-center gap-6">
+                  <button 
+                    disabled={!selectedStyle}
+                    onClick={handleStartGeneration} 
+                    className="w-full sm:w-auto bg-[#C5A059] text-black px-16 py-8 font-black uppercase tracking-[0.4em] hover:bg-white hover:text-[#C5A059] transition-all duration-700 shadow-2xl gold-shadow flex items-center justify-center gap-6 disabled:opacity-20 disabled:cursor-not-allowed"
+                  >
                     SYNTHESIZE DESIGN <Wand2 className="w-6 h-6" />
                   </button>
                 </div>

@@ -80,16 +80,16 @@ export function BeforeAfterSlider() {
             className="absolute inset-y-0 w-[2px] bg-[#C5A059] shadow-[0_0_20px_rgba(197,160,89,0.5)] z-20"
             style={{ left: `${sliderPosition}%` }}
           >
+            {/* Tag Overlays moving with Handle */}
+            <div className="absolute top-10 right-[30px] bg-[#050505]/90 backdrop-blur-xl border border-white/10 text-white px-5 py-2 rounded-full text-[10px] font-black tracking-[0.4em] uppercase whitespace-nowrap shadow-2xl">
+                Before
+            </div>
+            <div className="absolute top-10 left-[30px] bg-[#C5A059] text-black px-5 py-2 rounded-full text-[10px] font-black tracking-[0.4em] uppercase whitespace-nowrap shadow-2xl font-display">
+                After
+            </div>
+
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-white flex items-center justify-center rounded-full shadow-[0_0_40px_rgba(0,0,0,0.4)] border-4 border-[#C5A059] transition-transform group-active:scale-110">
                <ArrowLeftRight className="w-5 h-5 text-black" />
-            </div>
-            
-            {/* Unique Tag Overlays */}
-            <div className="absolute top-10 left-[-120px] bg-[#050505]/90 backdrop-blur-xl border border-white/10 text-white px-5 py-2 rounded-full text-[9px] font-black tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-all">
-                Structural RAW
-            </div>
-            <div className="absolute top-10 right-[-120px] bg-[#C5A059] text-black px-5 py-2 rounded-full text-[9px] font-black tracking-[0.3em] uppercase opacity-0 group-hover:opacity-100 transition-all font-display">
-                Elite Render
             </div>
           </div>
 
