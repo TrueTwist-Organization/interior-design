@@ -89,7 +89,7 @@ export function Hero() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 items-center justify-center lg:justify-start">
-              <Link href="/dashboard" className="w-full sm:w-auto overflow-hidden group">
+              <Link href="/signup" className="w-full sm:w-auto overflow-hidden group">
                 <button className="relative w-full sm:w-auto bg-[#C5A059] text-black px-12 py-5 text-[10px] uppercase font-black tracking-[0.4em] transition-all duration-700 shadow-[0_20px_40px_rgba(197,160,89,0.15)] overflow-hidden">
                   <span className="relative z-10 flex items-center justify-center gap-4">Initialize Studio <ArrowRight className="w-4 h-4" /></span>
                   <div className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-500 z-0" />
