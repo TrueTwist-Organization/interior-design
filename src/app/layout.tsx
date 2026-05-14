@@ -24,10 +24,10 @@ export default function RootLayout({
         <link rel="stylesheet" href="https://cdn.pannellum.org/2.5/pannellum.css" />
         <script src="https://cdn.pannellum.org/2.5/pannellum.js"></script>
       </head>
-      <body className={`${inter.variable} ${outfit.variable} font-sans antialiased overflow-x-hidden bg-[#0A0A0A]`}>
+      <body className={`${inter.variable} ${outfit.variable} font-sans antialiased overflow-x-hidden bg-[#0A0A0A] flex flex-col min-h-screen`}>
         <Background3D />
         <Navbar />
-        <main className="min-h-screen">
+        <main className="flex-1 flex flex-col">
           {children}
         </main>
         <Footer />

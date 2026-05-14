@@ -20,6 +20,7 @@ export default function VideoGenerationPage() {
 
   useEffect(() => {
     setMounted(true)
+    window.scrollTo({ top: 0, behavior: "smooth" })
     const d = localStorage.getItem("latest_design")
     if (d) {
       try {

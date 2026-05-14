@@ -14,6 +14,7 @@ export default function ResultsPage() {
   const [isDownloading, setIsDownloading] = useState(false)
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
     try {
       const saved = localStorage.getItem("latest_design")
       if (saved) {

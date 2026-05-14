@@ -64,10 +64,21 @@ export function Footer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto border-t border-white/5 pt-12 flex flex-col items-center justify-center gap-6">
-         <span className="text-[10px] uppercase font-black tracking-[0.3em] text-slate-500">
-            © 2026 InteriorAI Studio. All Rights Reserved.
-         </span>
+      <div className="max-w-7xl mx-auto border-t border-white/5 pt-12 flex flex-col items-center justify-center gap-8">
+         <div className="flex flex-col items-center gap-4">
+           <span className="text-[10px] uppercase font-black tracking-[0.3em] text-slate-500 text-center">
+              © 2026 InteriorAI Studio. All Rights Reserved.
+           </span>
+           <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-[9px] uppercase font-black tracking-[0.2em] text-slate-600">
+             <span>
+               Designed By <a href="https://truetwist.in/" target="_blank" rel="noopener noreferrer" className="text-[#C5A059] hover:text-white transition-colors">Trutwist</a>
+             </span>
+             <span className="hidden sm:block text-white/10">•</span>
+             <span>
+               Marketing By <a href="https://369network.com/" target="_blank" rel="noopener noreferrer" className="text-[#C5A059] hover:text-white transition-colors">369 Network</a>
+             </span>
+           </div>
+         </div>
          
          <div className="flex items-center gap-4">
             <span className="relative flex h-2 w-2">

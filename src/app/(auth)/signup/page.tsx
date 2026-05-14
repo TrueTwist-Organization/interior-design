@@ -5,9 +5,18 @@ import { Card } from "@/components/ui/Card"
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { Mail, Lock, User, Globe, Sparkles } from "lucide-react"
-
+import { useRouter } from "next/navigation"
 
 export default function SignupPage() {
+  const router = useRouter()
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    // Mock user creation delay if needed or API call can go here
+    // Redirect to login page
+    router.push("/login")
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 pt-32 pb-24 bg-[#0A0A0A]">
       <motion.div
@@ -24,7 +33,7 @@ export default function SignupPage() {
             <p className="text-slate-500 tracking-wide text-sm">Start designing your dream space today.</p>
           </div>
 
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-1.5">
               <label className="text-[10px] uppercase font-bold tracking-[0.2em] ml-1 text-slate-400">Full Name</label>
               <div className="relative">
@@ -61,7 +70,7 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <Button className="w-full rounded-2xl h-14 mt-6 bg-[#C5A059] text-black hover:bg-white font-bold tracking-[0.2em] uppercase transition-all shadow-xl shadow-[#C5A059]/10">
+            <Button type="submit" className="w-full rounded-2xl h-14 mt-6 bg-[#C5A059] text-black hover:bg-white font-bold tracking-[0.2em] uppercase transition-all shadow-xl shadow-[#C5A059]/10">
               Create Account
             </Button>
           </form>

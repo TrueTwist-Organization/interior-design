@@ -17,6 +17,10 @@ export default function DashboardPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [processingStatus, setProcessingStatus] = useState("")
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step, isGenerating]);
+
   const roomTypes: Record<string, string[]> = {
     "1 BHK": ["Living Room", "Bedroom", "Kitchen", "Balcony"],
     "2 BHK": ["Living Room", "Bedroom 1", "Bedroom 2", "Kitchen", "Balcony"],
